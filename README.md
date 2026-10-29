@@ -39,6 +39,16 @@ No custom backend: the one operation that cannot be trusted to the browser — c
 the CO₂ saved before it is written to a shared total — is a `SECURITY DEFINER` Postgres
 function.
 
+## Deployment
+
+Hosted on **Vercel**. Pushes to `main` deploy to production; every pull request gets a
+preview URL. Build settings, the SPA rewrite and asset cache headers live in
+`vercel.json` — the only manual step is adding the three `VITE_` environment variables
+in the Vercel dashboard. Full walkthrough in [docs/06 §6.6](docs/06-setup-guide.md).
+
+> `VITE_` variables are compiled into the client bundle. Only the Supabase **anon**
+> key belongs there; it is safe because row-level security constrains it.
+
 ## Privacy
 
 A logged trip stores a distance, a transport mode and a two-letter country code. No

@@ -92,25 +92,70 @@ be forged — fix it before going further.
 In the browser, confirm the same from the console on the deployed site: a direct
 `supabase.from('trip_logs').select()` should return no rows and an error.
 
-## 6.6 Deploy
+## 6.6 Deploy to Vercel
 
-Either host works; pick one in Sprint 0 and do not maintain both.
+Hosting is Vercel (decided in Sprint 0). `vercel.json` in the repository root holds the
+build settings, the SPA rewrite and the asset cache headers, so the dashboard needs
+almost nothing configured by hand.
 
-**Netlify**
-- Build command `npm run build`, publish directory `dist`.
-- Add both `VITE_` variables under Site configuration → Environment variables.
-- Add `public/_redirects` containing `/*  /index.html  200` so deep links work with
-  history-mode routing.
+### First-time setup
 
-**Vercel**
-- Framework preset: Vite. Build and output are detected.
-- Add the environment variables under Settings → Environment Variables.
-- SPA rewrites are handled automatically.
+1. Push the repository to GitHub (or GitLab / Bitbucket).
+2. At https://vercel.com → **Add New → Project**, import the repository.
+3. Vercel detects the Vite preset. Leave the build settings alone — `vercel.json`
+   already specifies `npm run build` and `dist`.
+4. Under **Environment Variables**, add both variables **before** the first deploy —
+   Vite inlines them at build time, so a deploy that ran without them will serve a
+   bundle with no Supabase connection until you redeploy:
+
+   | Name | Value | Environments |
+   |------|-------|--------------|
+   | `VITE_SUPABASE_URL` | your project URL | Production, Preview, Development |
+   | `VITE_SUPABASE_ANON_KEY` | your `anon` `public` key | Production, Preview, Development |
+   | `VITE_APP_CONTACT` | your team email | Production, Preview, Development |
+
+5. Deploy. Subsequent pushes to `main` deploy to production automatically; every pull
+   request gets its own preview URL, which is what the sprint reviews should demo.
+
+> Only ever put the **anon** key here. Anything prefixed `VITE_` is compiled into the
+> JavaScript bundle and is readable by anyone who opens devtools. The service-role key
+> must never appear in a `VITE_` variable, in `vercel.json`, or in this repository.
+
+### What `vercel.json` does
+
+```json
+"rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+```
+
+Vue Router runs in history mode, so `/dashboard` is a client-side path with no file
+behind it. Without this rewrite, loading or refreshing that URL directly returns a 404.
+Vercel checks the filesystem before applying rewrites, so real assets are still served
+normally; only unmatched paths fall through to `index.html`.
+
+The `headers` block marks `/assets/*` immutable for a year. Vite content-hashes those
+filenames, so a changed file gets a new name and the stale cache can never be served.
+
+### Changing the environment later
+
+Environment variables are read at **build** time, not run time. After editing one in
+the Vercel dashboard you must redeploy (Deployments → ⋯ → Redeploy) for the change to
+reach the bundle. Editing the variable alone changes nothing on the live site.
+
+### Verifying a deploy
+
+1. Open the production URL, run a calculation — confirms the build and the OSM services.
+2. Navigate to `/dashboard`, then **refresh the page** — confirms the SPA rewrite.
+3. Open devtools → Console and run
+   `await (await fetch('/')).status` — sanity check, expect `200`.
+4. From that console, confirm RLS holds in production: a direct
+   `supabase.from('trip_logs').select()` must return an error and no rows
+   (checks D-8 and D-9 in `08-testing-and-acceptance.md`).
 
 ## 6.7 Project layout
 
 ```
 .
+├── vercel.json                deploy settings: SPA rewrite + asset cache headers
 ├── docs/                      specification and plan (this folder)
 ├── supabase/
 │   ├── migrations/            schema — apply in order

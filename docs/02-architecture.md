@@ -43,7 +43,7 @@ we write is SQL (tables, views, and two functions).
 | Database | Supabase (Postgres) | Free tier, instant REST API, RLS, SQL views do the aggregation for us. |
 | Geocoding | Nominatim | Free, no key. Rate-limited to 1 req/s — we debounce and cache. |
 | Distance | OSRM demo server | Free, no key, real road distance rather than straight-line. |
-| Hosting | Netlify or Vercel (decide in Sprint 0) | Both deploy a Vite SPA from git with zero config. |
+| Hosting | Vercel | Deploys a Vite SPA from git with no build configuration; free tier covers coursework traffic; preview deployments per pull request. |
 
 ### Why no custom backend
 

@@ -17,7 +17,7 @@ Legend: **M** = must-have, **S** = should-have, **X** = stretch.
 | T-0.1 | Initialise the git repository; push to the team remote; set branch protection on `main`. | M |
 | T-0.2 | Confirm the Vite + Vue + Pinia + Router scaffold runs (`npm run dev`). | M |
 | T-0.3 | Create the Supabase project; record the URL and anon key in each member's `.env.local`. | M |
-| T-0.4 | Decide hosting (Netlify vs Vercel) and wire up deploy-on-push to `main`. | M |
+| T-0.4 | Connect the repository to Vercel and confirm deploy-on-push to `main` plus preview deployments on pull requests. | M |
 | T-0.5 | Agree branch naming, PR review rule (one approval), and commit message style. | M |
 | T-0.6 | Apply `0001_init.sql` to Supabase; verify the tables exist. | M |
 
