@@ -1,0 +1,15 @@
+mode_key,mode_label,category,factor_g_per_pkm,is_baseline,display_order,source_id,notes
+walking,Walking,active,0,false,1,desnz-2024,Zero on an operational basis.
+cycling,Cycling,active,0,false,2,desnz-2024,Zero on an operational basis.
+e_scooter,E-scooter,other,20,false,3,climatecouncil-2017,Shared-fleet lifecycle estimate.
+coach,Coach,public_transport,27,false,4,desnz-2024,Average load factor.
+train_metro,Metro / underground,public_transport,28,false,5,desnz-2024,Average load factor.
+tram,Tram / light rail,public_transport,29,false,6,desnz-2024,Average load factor.
+train_national,National rail,public_transport,35,false,7,desnz-2024,Average load factor.
+car_electric,Electric car,car,47,false,8,kaggle-vehicle-co2,Grid average; 1.6 occupants.
+bus_city,City bus,public_transport,97,false,9,desnz-2024,Average load factor.
+motorbike,Motorbike,other,103,false,10,desnz-2024,Single rider.
+ferry,Ferry (foot passenger),other,113,false,11,desnz-2024,Foot passenger.
+car_average,Car (average),car,170,true,12,kaggle-vehicle-co2,SAVINGS BASELINE. 1.6 occupants.
+car_petrol,Petrol car,car,170,false,13,kaggle-vehicle-co2,Medium petrol car; 1.6 occupants.
+car_diesel,Diesel car,car,171,false,14,kaggle-vehicle-co2,Medium diesel car; 1.6 occupants.
