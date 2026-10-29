@@ -56,6 +56,21 @@ export const useTripStore = defineStore('trip', () => {
   const worst = computed(() => comparison.value.at(-1) ?? null)
   const best = computed(() => comparison.value[0] ?? null)
 
+  /**
+   * The headline swap for this journey (E2.2): the biggest saving available
+   * that is not simply "walk instead". We take the cleanest *powered* mode so
+   * the message stays actionable for a 40 km commute; if none exists, fall back
+   * to the cleanest mode overall.
+   */
+  const headlineSwap = computed(() => {
+    const from = comparison.value.find((m) => m.isBaseline) ?? worst.value
+    if (!from) return null
+    const powered = comparison.value.filter((m) => m.category !== 'active' && m.kg < from.kg)
+    const to = powered[0] ?? best.value
+    if (!to || to.modeKey === from.modeKey) return null
+    return { from, to, savedKg: from.kg - to.kg }
+  })
+
   async function calculate() {
     if (!ready.value) return
     calculating.value = true
@@ -85,7 +100,10 @@ export const useTripStore = defineStore('trip', () => {
     logging.value = true
     error.value = null
 
+    // Region comes from the start point, like the country code. Addresses and
+    // coordinates are never sent (E6.2).
     const countryCode = origin.value?.countryCode || 'ZZ'
+    const regionName = origin.value?.region || null
 
     try {
       if (!supabaseConfigured) {
@@ -94,7 +112,8 @@ export const useTripStore = defineStore('trip', () => {
       const { data, error: rpcError } = await supabase.rpc('log_trip', {
         p_distance_km: Number(effectiveKm.value.toFixed(2)),
         p_mode_key: modeKey,
-        p_country_code: countryCode
+        p_country_code: countryCode,
+        p_region_name: regionName
       })
       if (rpcError) throw rpcError
 
@@ -102,7 +121,9 @@ export const useTripStore = defineStore('trip', () => {
         modeKey,
         savedKg: Number(data.saved_kg),
         emittedKg: Number(data.emitted_kg),
-        countryCode: data.country_code
+        countryCode: data.country_code,
+        regionName: data.region_name,
+        regionTotalKg: data.region_total_kg == null ? null : Number(data.region_total_kg)
       }
       sessionSavedKg.value += Number(data.saved_kg)
       return lastLog.value
@@ -129,7 +150,7 @@ export const useTripStore = defineStore('trip', () => {
     origin, destination, returnTrip, carMode,
     distanceKm, effectiveKm, approximate, geometry, durationMin,
     calculating, error, logging, lastLog, sessionSavedKg,
-    ready, comparison, allModes, best, worst,
+    ready, comparison, allModes, best, worst, headlineSwap,
     calculate, logTrip, reset
   }
 })

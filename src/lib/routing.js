@@ -73,7 +73,7 @@ export async function routeDistance(from, to, options = {}) {
       durationMin: route.duration ? route.duration / 60 : null
     }
   } catch (err) {
-    console.warn('[CarbonRoute] routing fell back to straight-line distance:', err.message)
+    console.warn('[CO2 Compare] routing fell back to straight-line distance:', err.message)
     return {
       km: haversineKm(from, to) * DETOUR_FACTOR,
       approximate: true,

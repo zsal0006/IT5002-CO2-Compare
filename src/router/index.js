@@ -1,19 +1,26 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import CalculatorView from '@/views/CalculatorView.vue'
+import CompareView from '@/views/CompareView.vue'
 
 const routes = [
-  { path: '/', name: 'calculator', component: CalculatorView, meta: { title: 'Compare a journey' } },
+  { path: '/', name: 'compare', component: CompareView, meta: { title: 'Compare your commute' } },
+  {
+    path: '/impact',
+    name: 'impact',
+    component: () => import('@/views/ImpactView.vue'),
+    meta: { title: 'Community impact' }
+  },
   {
     path: '/dashboard',
     name: 'dashboard',
     component: () => import('@/views/DashboardView.vue'),
-    meta: { title: 'Emissions dashboard' }
+    meta: { title: 'Transport emissions by country' }
   },
   {
+    // Reached from "How we calculate this" rather than the main nav (E2.4).
     path: '/learn',
     name: 'learn',
     component: () => import('@/views/LearnView.vue'),
-    meta: { title: 'How this works' }
+    meta: { title: 'How we calculate this' }
   },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
@@ -25,7 +32,7 @@ const router = createRouter({
 })
 
 router.afterEach((to) => {
-  document.title = to.meta.title ? `${to.meta.title} · CarbonRoute` : 'CarbonRoute'
+  document.title = to.meta.title ? `${to.meta.title} · CO2 Compare` : 'CO2 Compare'
 })
 
 export default router

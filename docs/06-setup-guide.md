@@ -16,8 +16,8 @@ calculator runs without one, using the bundled fallback factors.
 ## 6.2 Run the app locally
 
 ```bash
-git clone <your-team-remote> carbonroute
-cd carbonroute
+git clone <your-team-remote> co2-compare
+cd co2-compare
 npm install
 cp .env.example .env.local      # Windows: copy .env.example .env.local
 npm run dev
@@ -64,6 +64,24 @@ VITE_APP_CONTACT=your-team-email@example.ac.uk
 6. Run `missingAlpha2()` from `src/lib/iso.js` against the distinct country codes and
    add anything it reports.
 
+## 6.4b Country boundaries (already vendored)
+
+`public/geo/countries.geo.json` is committed to the repository — the world map (story
+5.3) needs it and the emissions datasets do not contain geometry. It is Natural Earth
+derived, public domain, 180 features keyed by ISO alpha-3.
+
+Nothing to do unless you want to refresh it. If you do, keep `feature.id` as the
+alpha-3 code: `WorldEmissionsMap.vue` joins on it.
+
+After loading the GIZ data, reconcile the two lists (task T-4.10):
+
+```sql
+select distinct country_code from country_transport_emissions order by 1;
+```
+
+Anything in that list with no matching boundary feature simply renders unshaded. Note
+the unmatched codes on the Learn page rather than leaving them unexplained.
+
 ## 6.5 Verify the install
 
 Run these in the SQL editor. All four should pass.
@@ -79,11 +97,11 @@ select count(*) as rows, count(distinct country_code) as countries
 from country_transport_emissions;            -- expect thousands, ~190
 
 -- 3. Logging works and computes the saving itself
-select log_trip(10, 'cycling', 'GB');        -- expect saved_kg ≈ 1.7
+select log_trip(10, 'cycling', 'GB', 'Scotland');   -- expect saved_kg ≈ 1.7
 
 -- 4. Direct writes are refused
-insert into trip_logs (distance_km, mode_key, country_code, emitted_g, saved_g)
-values (1, 'cycling', 'GB', 0, 999999);      -- expect a policy violation
+insert into trip_logs (distance_km, mode_key, country_code, region_name, emitted_g, saved_g)
+values (1, 'cycling', 'GB', 'Scotland', 0, 999999);  -- expect a policy violation
 ```
 
 Check 4 must fail. If it succeeds, RLS has not been applied and the leaderboard can
@@ -160,6 +178,7 @@ reach the bundle. Editing the variable alone changes nothing on the live site.
 ├── supabase/
 │   ├── migrations/            schema — apply in order
 │   └── seed/                  reference data
+├── public/geo/                vendored country boundaries for the world map
 ├── data/                      human-editable CSVs; raw downloads git-ignored
 ├── public/
 └── src/
@@ -171,7 +190,7 @@ reach the bundle. Editing the variable alone changes nothing on the live site.
     │   └── supabase.js        client, degrades when unconfigured
     ├── stores/                Pinia: factors · trip · stats · countries
     ├── components/            presentational, no data fetching
-    ├── views/                 one per route, orchestrate stores
+    ├── views/                 Compare · Impact · Dashboard · Learn
     └── assets/theme.css       design tokens incl. the validated chart palette
 ```
 

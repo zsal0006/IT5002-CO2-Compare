@@ -16,7 +16,7 @@ export const supabase = supabaseConfigured
 
 if (!supabaseConfigured) {
   console.warn(
-    '[CarbonRoute] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set. ' +
+    '[CO2 Compare] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set. ' +
       'Copy .env.example to .env.local. Running with bundled fallback data.'
   )
 }

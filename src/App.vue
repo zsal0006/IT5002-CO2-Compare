@@ -7,11 +7,11 @@ import { RouterLink, RouterView } from 'vue-router'
 
   <header class="site-header">
     <div class="container bar">
-      <RouterLink to="/" class="brand">CarbonRoute</RouterLink>
+      <RouterLink to="/" class="brand">CO2 Compare</RouterLink>
       <nav aria-label="Main">
         <RouterLink to="/">Compare</RouterLink>
+        <RouterLink to="/impact">Impact</RouterLink>
         <RouterLink to="/dashboard">Dashboard</RouterLink>
-        <RouterLink to="/learn">How it works</RouterLink>
       </nav>
     </div>
   </header>
@@ -23,9 +23,10 @@ import { RouterLink, RouterView } from 'vue-router'
   <footer class="site-footer">
     <div class="container">
       <p class="muted">
-        CarbonRoute — IT5002 coursework project. Emission factors and national emissions
-        data are credited on the <RouterLink to="/learn">How it works</RouterLink> page.
-        Geocoding and routing © OpenStreetMap contributors.
+        CO2 Compare — IT5002 coursework project. Emission factors and national
+        emissions data are credited on the
+        <RouterLink to="/learn">How we calculate this</RouterLink> page. Geocoding and
+        routing © OpenStreetMap contributors; country boundaries from Natural Earth.
       </p>
     </div>
   </footer>

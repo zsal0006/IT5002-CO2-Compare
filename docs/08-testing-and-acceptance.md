@@ -52,6 +52,7 @@ npm pkg set scripts.test=vitest
 | U-13 | `toAlpha2('AUT')` is `'AT'`, not `'AU'` — the truncation bug this table exists to prevent. |
 | U-14 | `toAlpha2('WORLD')` is `'ZZ'`. |
 | U-15 | Every value in the table is two uppercase letters, and values are unique. |
+| U-16 | Every country code in the GIZ dataset resolves to a boundary feature, or is on a known-unmatched list. |
 
 ## 8.3 Database integration checks
 
@@ -70,6 +71,10 @@ Run after every schema change.
 | D-9 | Direct `select from trip_logs` as anon | no rows and an error |
 | D-10 | `select * from v_savings_global` as anon | succeeds |
 | D-11 | Car factor above 400 g/p-km in the seed | seed raises the unit-mix-up guard |
+| D-12 | `select log_trip(10, 'cycling', 'GB', 'Scotland')` | row stored with `region_name = 'Scotland'`; `region_total_kg` returned |
+| D-13 | `select log_trip(10, 'cycling', 'GB', null)` | row stored with `region_name` null; appears under "Unknown region" in `v_savings_by_region` |
+| D-14 | `select log_trip(10, 'cycling', 'GB', repeat('x', 500))` | region truncated to 80 characters, no error |
+| D-15 | `select * from v_savings_by_mode` with zero trips logged | every active mode present with zeroes, no nulls, no division-by-zero |
 
 D-8 and D-9 must be run from the **browser console on the deployed site**, not the
 SQL editor — the editor runs as a privileged role and will happily let you through.
@@ -99,7 +104,19 @@ One row per functional requirement. Record pass/fail per sprint review.
 | FR-17 | Select a country. | Line chart spans the dataset's year range. |
 | FR-18 | Select a country with total emissions data. | Share-of-total percentage shown; blank where the source has no total. |
 | FR-19 | *(stretch)* | Up to three countries on one chart, each with a legend entry. |
-| FR-20 | Open "How it works". | Formula, factor table, all four sources with links and licences, and the full limitations list. |
+| FR-20 | Follow "How we calculate this" under the results. | Formula, factor table, all four sources with links and licences, and the full limitations list. |
+| FR-21 | Click "Use my current location", allow the permission. | Start field fills with your location. Declining shows a message and leaves the form usable. |
+| FR-22 | Calculate any journey over 5 km. | A sentence states the headline swap and its saving, e.g. "Switching from car to national rail saves 3.4 kg CO₂e". |
+| FR-23 | Log a trip, open Impact. | Region selector lists your region; its total includes your trip. |
+| FR-24 | Open Impact with several modes logged. | Modes ranked by kg avoided, descending, with trip counts alongside. |
+| FR-25 | Open Dashboard. | Map shaded, legend shows real ranges in Mt CO₂e, hovering a country shows its name and figure, clicking one loads its trend below. |
+| FR-26 | Change a factor in `emission_factors`, reload. | The comparison changes without a code edit or redeploy. |
+
+### Story acceptance
+
+`09-epics-and-traceability.md` §9.6 reproduces the team's own acceptance criteria
+verbatim. At each sprint review, walk those sentences rather than this table — this
+table is the engineering restatement, those are the agreed words.
 
 ## 8.5 Non-functional checks
 
@@ -123,6 +140,10 @@ One row per functional requirement. Record pass/fail per sprint review.
 - Offline → calculator falls back, dashboard shows an error state rather than a blank page.
 - A country in the emissions dataset with no logged trips → tiles show 0, not `NaN` or `—`.
 - A dataset row with a null total → share column blank, no division-by-zero.
+- A country in the boundary file with no emissions row → renders unshaded, tooltip says "No data", clicking it does nothing.
+- A geocode result with no `address.state` (small countries, city-states) → trip logs under "Unknown region" without error.
+- Two different countries with a same-named region → kept distinct, because the region key is `country_code` + `region_name`.
+- Geolocation permission previously denied at the browser level → message appears immediately, form still usable.
 
 ## 8.7 Demo script (5 minutes)
 
@@ -130,6 +151,9 @@ One row per functional requirement. Record pass/fail per sprint review.
 2. **Calculate** Edinburgh → Glasgow. Point at the chart; name the driving figure.
 3. **Switch** the car to electric; note what changes and what does not.
 4. **Log** the trip as rail; show the global counter move.
-5. **Dashboard** — pick a country, walk through the time series, then the savings table.
-6. **How it works** — show the sources and read one limitation aloud. Finish on the
-   privacy paragraph: this is why the trip log holds no coordinates.
+5. **Impact** — show the global total move, then switch region and show the
+   savings-by-mode chart.
+6. **Dashboard** — start on the map, click a large emitter, let its trend load, then
+   name its transport share.
+7. **How we calculate this** — show the sources and read one limitation aloud. Finish
+   on the privacy paragraph: this is why the trip log holds no coordinates.

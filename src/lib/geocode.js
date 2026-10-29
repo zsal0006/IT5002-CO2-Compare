@@ -10,8 +10,9 @@
  */
 
 const ENDPOINT = 'https://nominatim.openstreetmap.org/search'
+const REVERSE_ENDPOINT = 'https://nominatim.openstreetmap.org/reverse'
 const MIN_INTERVAL_MS = 1100
-const CONTACT = import.meta.env.VITE_APP_CONTACT || 'carbonroute-it5002'
+const CONTACT = import.meta.env.VITE_APP_CONTACT || 'co2-compare-it5002'
 
 const cache = new Map()
 let lastCallAt = 0
@@ -34,6 +35,8 @@ function throttle(fn) {
  * @property {number} lat
  * @property {number} lon
  * @property {string} countryCode ISO 3166-1 alpha-2, uppercase, or 'ZZ'
+ * @property {string|null} region state or province, used for the community
+ *   totals (E4.1). Null when the geocoder does not report one.
  */
 
 /**
@@ -74,12 +77,77 @@ export async function geocode(query, options = {}) {
 }
 
 function toPlace(raw) {
+  const address = raw.address ?? {}
   return {
     label: raw.display_name,
     lat: Number(raw.lat),
     lon: Number(raw.lon),
-    countryCode: (raw.address?.country_code || 'ZZ').toUpperCase()
+    countryCode: (address.country_code || 'ZZ').toUpperCase(),
+    // Nominatim names this differently by country: `state` in most federal
+    // countries, `region` or `county` elsewhere. We take the first that exists
+    // and stop there -- nothing finer than a province is recorded (E6.2).
+    region: address.state || address.region || address.county || null
   }
+}
+
+/**
+ * Reverse-geocode a browser geolocation fix into a Place (E1.2).
+ * @param {number} lat
+ * @param {number} lon
+ * @returns {Promise<Place|null>}
+ */
+export async function reverseGeocode(lat, lon) {
+  return throttle(async () => {
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lon: String(lon),
+      format: 'jsonv2',
+      addressdetails: '1',
+      zoom: '16'
+    })
+    const res = await fetch(`${REVERSE_ENDPOINT}?${params}`, {
+      headers: { Accept: 'application/json', 'Accept-Language': 'en' },
+      referrerPolicy: 'strict-origin-when-cross-origin'
+    })
+    if (!res.ok) throw new Error(`Reverse geocoding failed (${res.status})`)
+    const json = await res.json()
+    return json?.lat ? toPlace(json) : null
+  })
+}
+
+/**
+ * Ask the browser where we are, then name the place. Requires a user gesture and
+ * an explicit permission grant; we never poll for location in the background.
+ * @returns {Promise<Place>}
+ */
+export function currentLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('This browser cannot report your location.'))
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const place = await reverseGeocode(coords.latitude, coords.longitude)
+          if (!place) throw new Error('We could not name your current location.')
+          resolve(place)
+        } catch (err) {
+          reject(err)
+        }
+      },
+      (err) => {
+        reject(
+          new Error(
+            err.code === err.PERMISSION_DENIED
+              ? 'Location access was declined. Type a start location instead.'
+              : 'We could not get your location. Type a start location instead.'
+          )
+        )
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    )
+  })
 }
 
 /** Shorten a Nominatim display_name to something that fits in a chip. */

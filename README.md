@@ -1,4 +1,4 @@
-# CarbonRoute
+# CO2 Compare
 
 Compare the carbon cost of a journey by car, bus, train, bicycle and on foot — then
 log what you actually took and watch the avoided emissions add up across your country
@@ -22,13 +22,14 @@ trip logging you need a Supabase project — see
 
 ## What it does
 
-- **Compare** — enter two places, get kg CO₂e for five transport modes over that route.
-- **Log** — record the mode you actually used; the saving versus driving is computed
-  in the database and added to your country's total.
-- **Dashboard** — national transport-sector emissions from 1970 to 2024, the transport
-  share of national totals, and what users have collectively avoided.
-- **How it works** — the formula, every emission factor with its source, and an honest
-  list of what the numbers do not tell you.
+- **Compare** — enter two places, get kg CO₂e for five transport modes over that
+  route, and log the mode you actually took.
+- **Impact** — what everyone has avoided, by region and globally, broken down by
+  transport mode.
+- **Dashboard** — a world map shaded by transport emissions, plus any country's
+  emissions trend since 1970 and its share of that country's total.
+- **How we calculate this** — the formula, every emission factor with its source, and
+  an honest list of what the numbers do not tell you.
 
 ## Stack
 
@@ -51,10 +52,12 @@ in the Vercel dashboard. Full walkthrough in [docs/06 §6.6](docs/06-setup-guide
 
 ## Privacy
 
-A logged trip stores a distance, a transport mode and a two-letter country code. No
-accounts, no cookies, no tracking, and deliberately no coordinates: a home-to-work
-coordinate pair is close to unique, so storing it would undo the anonymity the rest of
-the design depends on.
+A logged trip stores a distance, a transport mode, a country code and a state or
+province. No accounts, no cookies, no tracking, and deliberately no addresses and no
+coordinates: a home-to-work coordinate pair is close to unique, so storing it would
+undo the anonymity the rest of the design depends on. A province holds millions of
+people and cannot narrow to a person, which is why the line is drawn there and no
+finer.
 
 ## Documentation
 
@@ -68,6 +71,7 @@ the design depends on.
 | [06 Setup guide](docs/06-setup-guide.md) | Local setup, Supabase, data loading, deployment, conventions |
 | [07 API contracts](docs/07-api-contracts.md) | Every external and internal interface |
 | [08 Testing and acceptance](docs/08-testing-and-acceptance.md) | Test plan, acceptance criteria per requirement, demo script |
+| [09 Epics and traceability](docs/09-epics-and-traceability.md) | The team's epics and user stories mapped to requirements, tasks and code |
 
 ## Repository layout
 
@@ -75,6 +79,7 @@ the design depends on.
 docs/        specification and plan
 supabase/    migrations and seed SQL
 data/        human-editable reference CSVs
+public/geo/  vendored country boundaries for the world map
 src/lib/     pure logic — the calculation, geocoding, routing, country codes
 src/stores/  Pinia stores
 src/views/   one per route
@@ -93,4 +98,4 @@ src/components/
 
 Geocoding and routing © OpenStreetMap contributors (Nominatim, OSRM).
 Emission factors and national emissions data are credited in full on the app's
-"How it works" page and in [docs/04](docs/04-datasets-and-methodology.md).
+"How we calculate this" page and in [docs/04](docs/04-datasets-and-methodology.md).

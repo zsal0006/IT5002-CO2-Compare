@@ -1,8 +1,12 @@
 # 1. Requirements Specification
 
-Project: **CarbonRoute** — a carbon footprint comparison platform
+Project: **CO2 Compare** — a carbon footprint comparison platform
 Module: IT5002
-Status: baseline v1.0
+Status: v1.1 — reconciled with the team's epics, user stories and wireframes
+
+> The team's user stories in `09-epics-and-traceability.md` are the agreed statement
+> of scope. This document restates them as numbered requirements so the test plan can
+> reference them; where the two disagree, the user stories win.
 
 ---
 
@@ -10,7 +14,7 @@ Status: baseline v1.0
 
 People choosing how to make a journey rarely have a concrete number for what that
 choice costs in CO₂. Abstract annual figures ("transport is 20% of emissions") do
-not change behaviour; a per-trip number does. CarbonRoute closes that gap: enter two
+not change behaviour; a per-trip number does. CO2 Compare closes that gap: enter two
 points, see what each transport mode emits for that exact route, log the mode you
 actually used, and see the saving aggregated across everyone in your country and
 worldwide.
@@ -44,6 +48,8 @@ and an acceptance test (see `08-testing-and-acceptance.md`).
 | FR-6 | The user can switch the car sub-type (petrol / diesel / electric) and see the comparison update. | Should |
 | FR-7 | The system shows the route on a map. | Stretch |
 | FR-8 | The system supports a return-trip toggle (×2 distance). | Should |
+| FR-21 | The user can fill the start field from the browser's geolocation, on an explicit click. *(story 1.2)* | Could |
+| FR-22 | The results state the headline saving as a sentence — "switching from X to Y saves Z". *(story 2.2)* | Must |
 
 ### Logging and savings
 
@@ -52,7 +58,7 @@ and an acceptance test (see `08-testing-and-acceptance.md`).
 | FR-9 | The user can select the mode they actually used and log the trip. | Must |
 | FR-10 | Logging records distance, mode, emissions, and CO₂ saved versus the car baseline. | Must |
 | FR-11 | Saved CO₂ is computed server-side, not accepted from the client. | Must |
-| FR-12 | No personally identifying information is collected or stored at any point. | Must |
+| FR-12 | No personally identifying information is collected or stored at any point. A logged trip stores only mode, distance, CO₂ saved, country, region and date — never an address or a coordinate. *(story 6.2)* | Must |
 | FR-13 | The user sees their own cumulative saving for the current browser session. | Should |
 
 ### Dashboard
@@ -65,6 +71,10 @@ and an acceptance test (see `08-testing-and-acceptance.md`).
 | FR-17 | The dashboard shows a time series of transport emissions (1970–2024) for the selected country. | Must |
 | FR-18 | The dashboard shows transport emissions as a share of that country's total emissions. | Should |
 | FR-19 | Up to three countries can be compared on the same time series. | Stretch |
+| FR-23 | Savings totals are aggregated by sub-national region (state or province) as well as by country. *(story 4.1)* | Must |
+| FR-24 | Savings are broken down by transport mode, ranked by kilograms avoided. *(story 4.2)* | Should |
+| FR-25 | A world map shades countries by transport emissions, with a legend, hover detail, and selection loading that country's trend. *(story 5.3)* | Must |
+| FR-26 | Every calculation reads its emission factors from the database, not from values written into application code. *(story 6.1)* | Must |
 
 ### Information
 
@@ -97,5 +107,7 @@ and an acceptance test (see `08-testing-and-acceptance.md`).
 
 - Emission factors are per **passenger**-kilometre at average occupancy, not per vehicle-kilometre.
 - The "saved" baseline is an average petrol car. This is a convention, not a claim about what the user would otherwise have done, and is stated on-screen.
-- Country attribution uses the country of the trip's **start** point.
+- Country and region attribution use the trip's **start** point.
+- "Region" means a state or province. It is coarse enough that it cannot identify a
+  traveller, and nothing finer is recorded.
 - Public (unkeyed) OSM services are acceptable for a coursework-scale load.

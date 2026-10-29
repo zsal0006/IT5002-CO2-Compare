@@ -1,4 +1,4 @@
--- CarbonRoute — seed: data sources and emission factors
+-- CO2 Compare — seed: data sources and emission factors
 -- Idempotent. Re-run after editing data/emission_factors.csv.
 --
 -- UNIT: grams CO2e per PASSENGER-kilometre.

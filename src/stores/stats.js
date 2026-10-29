@@ -2,11 +2,15 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
 
-/** Aggregated savings logged by everyone, globally and per country (FR-14, FR-15). */
+/**
+ * Community totals: globally, by country, by region and by mode (E4.1, E4.2).
+ * All four are database views over trip_logs — the client never aggregates.
+ */
 export const useStatsStore = defineStore('stats', () => {
   const global = ref(null)        // { trips, total_saved_kg, ... }
   const byCountry = ref([])       // [{ country_code, trips, total_saved_kg, ... }]
-  const modePopularity = ref([])
+  const byRegion = ref([])        // [{ country_code, region_name, ... }]
+  const byMode = ref([])          // [{ mode_key, mode_label, total_saved_kg, ... }]
   const loading = ref(false)
   const error = ref(null)
 
@@ -19,15 +23,17 @@ export const useStatsStore = defineStore('stats', () => {
     loading.value = true
     error.value = null
     try {
-      const [g, c, m] = await Promise.all([
+      const [g, c, r, m] = await Promise.all([
         supabase.from('v_savings_global').select('*').single(),
         supabase.from('v_savings_by_country').select('*').order('total_saved_kg', { ascending: false }),
-        supabase.from('v_mode_popularity').select('*').order('trips', { ascending: false })
+        supabase.from('v_savings_by_region').select('*').order('total_saved_kg', { ascending: false }),
+        supabase.from('v_savings_by_mode').select('*').order('total_saved_kg', { ascending: false })
       ])
       if (g.error) throw g.error
       global.value = g.data
       byCountry.value = c.data ?? []
-      modePopularity.value = m.data ?? []
+      byRegion.value = r.data ?? []
+      byMode.value = m.data ?? []
     } catch (err) {
       error.value = `Could not load community totals: ${err.message}`
     } finally {
@@ -36,8 +42,22 @@ export const useStatsStore = defineStore('stats', () => {
   }
 
   function forCountry(code) {
-    return byCountry.value.find((r) => r.country_code === code) ?? null
+    return byCountry.value.find((row) => row.country_code === code) ?? null
   }
 
-  return { global, byCountry, modePopularity, loading, error, load, forCountry }
+  /** @param {string} code alpha-2 @param {string|null} region */
+  function forRegion(code, region) {
+    const name = region || 'Unknown region'
+    return byRegion.value.find((row) => row.country_code === code && row.region_name === name) ?? null
+  }
+
+  /** Regions within one country, for the Impact page selector. */
+  function regionsIn(code) {
+    return byRegion.value.filter((row) => row.country_code === code)
+  }
+
+  return {
+    global, byCountry, byRegion, byMode, loading, error,
+    load, forCountry, forRegion, regionsIn
+  }
 })

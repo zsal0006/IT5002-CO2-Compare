@@ -1,4 +1,4 @@
--- CarbonRoute — initial schema
+-- CO2 Compare — initial schema
 -- Apply in the Supabase SQL editor, or: supabase db push
 -- Idempotent: safe to re-run.
 
@@ -54,19 +54,24 @@ create index if not exists cte_country_idx on public.country_transport_emissions
 create index if not exists cte_year_idx    on public.country_transport_emissions (year);
 
 -- -------------------------------------------------------------------- trip_logs
--- Append-only and deliberately non-identifying: distance, mode, country only.
--- No coordinates, no IP, no user agent, no session id.
+-- Append-only and deliberately non-identifying: distance, mode, country and
+-- sub-national region only (E6.2). No coordinates, no addresses, no IP, no user
+-- agent, no session id. A state or province holds millions of people, so it
+-- cannot re-identify a traveller; a city or a coordinate pair could, which is
+-- why neither is stored.
 create table if not exists public.trip_logs (
   id           uuid primary key default gen_random_uuid(),
   created_at   timestamptz not null default now(),
   distance_km  numeric(8,2) not null check (distance_km > 0 and distance_km <= 20000),
   mode_key     text not null references public.emission_factors(mode_key),
   country_code char(2) not null default 'ZZ',
+  region_name  text,                      -- state / province, null when unknown
   emitted_g    numeric(12,2) not null check (emitted_g >= 0),
   saved_g      numeric(12,2) not null check (saved_g >= 0)
 );
 
 create index if not exists trip_logs_country_idx on public.trip_logs (country_code);
+create index if not exists trip_logs_region_idx  on public.trip_logs (country_code, region_name);
 create index if not exists trip_logs_created_idx on public.trip_logs (created_at desc);
 
 -- ------------------------------------------------------------------------ views
@@ -80,6 +85,18 @@ select
 from public.trip_logs t
 group by t.country_code;
 
+-- E4.1: "total CO2 saved in my region".
+create or replace view public.v_savings_by_region as
+select
+  t.country_code,
+  coalesce(t.region_name, 'Unknown region') as region_name,
+  count(*)                               as trips,
+  round(sum(t.saved_g)   / 1000.0, 2)    as total_saved_kg,
+  round(sum(t.emitted_g) / 1000.0, 2)    as total_emitted_kg,
+  round(sum(t.distance_km), 2)           as total_distance_km
+from public.trip_logs t
+group by t.country_code, coalesce(t.region_name, 'Unknown region');
+
 create or replace view public.v_savings_global as
 select
   count(*)                                        as trips,
@@ -89,13 +106,19 @@ select
   count(distinct t.country_code)                  as countries
 from public.trip_logs t;
 
-create or replace view public.v_mode_popularity as
+-- E4.2: "savings broken down by transport mode". Carries kg saved, not just a
+-- trip count -- a mode chosen rarely for long journeys can out-save a mode
+-- chosen often for short ones.
+create or replace view public.v_savings_by_mode as
 select
   f.mode_key,
   f.mode_label,
   f.category,
-  count(t.id) as trips,
-  round(100.0 * count(t.id) / nullif((select count(*) from public.trip_logs), 0), 1) as share_pct
+  count(t.id)                                       as trips,
+  round(coalesce(sum(t.saved_g), 0)   / 1000.0, 2)  as total_saved_kg,
+  round(coalesce(sum(t.emitted_g), 0) / 1000.0, 2)  as total_emitted_kg,
+  round(coalesce(sum(t.distance_km), 0), 2)         as total_distance_km,
+  round(100.0 * count(t.id) / nullif((select count(*) from public.trip_logs), 0), 1) as share_of_trips_pct
 from public.emission_factors f
 left join public.trip_logs t on t.mode_key = f.mode_key
 where f.is_active
@@ -108,7 +131,8 @@ group by f.mode_key, f.mode_label, f.category;
 create or replace function public.log_trip(
   p_distance_km  numeric,
   p_mode_key     text,
-  p_country_code text default 'ZZ'
+  p_country_code text default 'ZZ',
+  p_region_name  text default null
 ) returns json
 language plpgsql
 security definer
@@ -118,6 +142,7 @@ declare
   v_factor   numeric;
   v_baseline numeric;
   v_country  char(2);
+  v_region   text;
   v_emitted  numeric;
   v_saved    numeric;
   v_id       uuid;
@@ -141,11 +166,15 @@ begin
     v_country := 'ZZ';
   end if;
 
+  -- Trim and cap the region label. It is free text from the geocoder, so it is
+  -- length-limited and never interpolated anywhere it could be executed.
+  v_region := nullif(left(trim(coalesce(p_region_name, '')), 80), '');
+
   v_emitted := round(p_distance_km * v_factor, 2);
   v_saved   := round(greatest(0, p_distance_km * (v_baseline - v_factor)), 2);
 
-  insert into trip_logs (distance_km, mode_key, country_code, emitted_g, saved_g)
-  values (round(p_distance_km, 2), p_mode_key, v_country, v_emitted, v_saved)
+  insert into trip_logs (distance_km, mode_key, country_code, region_name, emitted_g, saved_g)
+  values (round(p_distance_km, 2), p_mode_key, v_country, v_region, v_emitted, v_saved)
   returning id into v_id;
 
   return json_build_object(
@@ -153,7 +182,11 @@ begin
     'emitted_kg',       round(v_emitted / 1000.0, 3),
     'saved_kg',         round(v_saved   / 1000.0, 3),
     'country_code',     v_country,
+    'region_name',      v_region,
     'country_total_kg', (select total_saved_kg from v_savings_by_country where country_code = v_country),
+    'region_total_kg',  (select total_saved_kg from v_savings_by_region
+                          where country_code = v_country
+                            and region_name = coalesce(v_region, 'Unknown region')),
     'global_total_kg',  (select total_saved_kg from v_savings_global)
   );
 end;
@@ -198,7 +231,8 @@ create policy read_country_emissions on public.country_transport_emissions
 -- No policy on trip_logs: with RLS enabled and no policy, anon can neither read
 -- nor write it directly. log_trip() is SECURITY DEFINER and bypasses this.
 
-grant select on public.v_savings_by_country, public.v_savings_global,
-                public.v_mode_popularity to anon, authenticated;
-grant execute on function public.log_trip(numeric, text, text)   to anon, authenticated;
+grant select on public.v_savings_by_country, public.v_savings_by_region,
+                public.v_savings_global,     public.v_savings_by_mode
+             to anon, authenticated;
+grant execute on function public.log_trip(numeric, text, text, text) to anon, authenticated;
 grant execute on function public.country_series(text)            to anon, authenticated;

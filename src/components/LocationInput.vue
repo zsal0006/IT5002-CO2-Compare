@@ -1,11 +1,13 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { geocode, shortLabel } from '@/lib/geocode'
+import { geocode, shortLabel, currentLocation } from '@/lib/geocode'
 
 const props = defineProps({
   label: { type: String, required: true },
   modelValue: { type: Object, default: null }, // Place | null
-  placeholder: { type: String, default: 'Town, city or address' }
+  placeholder: { type: String, default: 'Town, city or address' },
+  /** E1.2 — offered on the start field only. */
+  allowCurrentLocation: { type: Boolean, default: false }
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -49,6 +51,22 @@ function choose(place) {
   message.value = ''
 }
 
+const locating = ref(false)
+
+/** E1.2: fill the field from the browser's geolocation, on an explicit click. */
+async function useCurrentLocation() {
+  locating.value = true
+  message.value = ''
+  try {
+    const place = await currentLocation()
+    choose(place)
+  } catch (err) {
+    message.value = err.message
+  } finally {
+    locating.value = false
+  }
+}
+
 function clear() {
   emit('update:modelValue', null)
   query.value = ''
@@ -83,6 +101,16 @@ function clear() {
           <button class="secondary" @click="choose(c)">{{ c.label }}</button>
         </li>
       </ul>
+
+      <button
+        v-if="allowCurrentLocation"
+        type="button"
+        class="link locate"
+        :disabled="locating"
+        @click="useCurrentLocation"
+      >
+        {{ locating ? 'Finding you…' : 'Use my current location' }}
+      </button>
     </template>
   </div>
 </template>
@@ -103,6 +131,17 @@ function clear() {
 .clear { padding: 0.25rem 0.6rem; font-size: 0.8rem; }
 
 .candidates { list-style: none; margin: 0.4rem 0 0; padding: 0; display: grid; gap: 0.25rem; }
+.link {
+  background: none;
+  border: 0;
+  padding: 0.3rem 0;
+  color: var(--series-1);
+  font-size: 0.85rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.locate { display: block; margin-left: auto; }
+
 .candidates button {
   width: 100%;
   text-align: left;

@@ -2,7 +2,7 @@
 
 ## 2.1 Overview
 
-CarbonRoute is a **client-heavy SPA with a thin managed backend**. There is no
+CO2 Compare is a **client-heavy SPA with a thin managed backend**. There is no
 custom server process to build, deploy or pay for: Supabase provides Postgres, an
 auto-generated REST API over it, and row-level security. The only server-side code
 we write is SQL (tables, views, and two functions).

@@ -1,4 +1,4 @@
--- CarbonRoute — loader for the GIZ country-level transport emissions dataset.
+-- CO2 Compare — loader for the GIZ country-level transport emissions dataset.
 --
 -- Sprint 1, task T-1.1. Two routes depending on how you got the file:
 --
