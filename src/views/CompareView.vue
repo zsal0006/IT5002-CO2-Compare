@@ -43,7 +43,7 @@ async function onLog() {
 </script>
 
 <template>
-  <section class="container">
+  <section class="container page">
     <header class="intro">
       <h1>Compare your commute</h1>
       <p>See the environmental impact of your daily travel.</p>
@@ -167,11 +167,17 @@ async function onLog() {
 </template>
 
 <style scoped>
-.intro { margin: 1.5rem 0; max-width: 60ch; }
-.intro p { font-size: 1.05rem; }
+/*
+ * A single centred column, as the wireframes show. An earlier two-column grid
+ * reserved a results column that is empty until you search, which left half the
+ * page blank on the screen people see first.
+ */
+.page { width: min(40rem, 100%); margin-inline: auto; }
 
-.layout { display: grid; grid-template-columns: minmax(18rem, 22rem) 1fr; gap: 1.25rem; align-items: start; }
-@media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+.intro { margin: 1.5rem 0 2rem; text-align: center; }
+.intro p { font-size: 1.05rem; margin: 0; }
+
+.layout { display: grid; gap: 1.25rem; }
 
 .inputs button[type='submit'] { width: 100%; margin-top: 0.5rem; }
 .privacy { text-align: center; margin: 0.6rem 0 0; }
