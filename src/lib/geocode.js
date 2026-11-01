@@ -18,15 +18,41 @@ const cache = new Map()
 let lastCallAt = 0
 let chain = Promise.resolve()
 
-/** Serialises calls and keeps them at least MIN_INTERVAL_MS apart. */
-function throttle(fn) {
-  chain = chain.then(async () => {
+/** Thrown when a queued request was superseded before it ran. */
+export class SupersededError extends Error {
+  constructor() {
+    super('superseded')
+    this.name = 'SupersededError'
+  }
+}
+
+/**
+ * Serialises calls and keeps them at least MIN_INTERVAL_MS apart, as Nominatim's
+ * usage policy requires.
+ *
+ * The abort check matters as much as the spacing. Someone typing an address
+ * pauses several times, and each pause would otherwise add a request to the
+ * queue, every one of them waiting a further second behind the last — so the
+ * result for what you finally typed arrives five seconds late. Checking the
+ * signal both before the wait and after it means a superseded request leaves the
+ * queue immediately instead of consuming a slot, and only the latest query is
+ * ever actually sent.
+ */
+function throttle(fn, signal) {
+  const run = async () => {
+    if (signal?.aborted) throw new SupersededError()
     const wait = MIN_INTERVAL_MS - (Date.now() - lastCallAt)
     if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+    if (signal?.aborted) throw new SupersededError()
     lastCallAt = Date.now()
     return fn()
-  })
-  return chain
+  }
+  chain = chain.then(run, run)
+  // Keep the stored chain from staying rejected, which would otherwise make the
+  // next caller inherit this one's failure.
+  const result = chain
+  chain = chain.catch(() => {})
+  return result
 }
 
 /**
@@ -70,7 +96,7 @@ export async function geocode(query, options = {}) {
     if (!res.ok) throw new Error(`Geocoding failed (${res.status})`)
     const json = await res.json()
     return json.map(toPlace)
-  })
+  }, options.signal)
 
   cache.set(cacheKey, results)
   return results
