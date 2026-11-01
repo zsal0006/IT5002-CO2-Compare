@@ -62,6 +62,7 @@ async function onLog() {
           v-model="destination"
           label="End location"
           placeholder="Enter end address"
+          :bias="origin"
         />
 
         <div v-if="carOptions.length" class="field">

@@ -7,7 +7,13 @@ const props = defineProps({
   modelValue: { type: Object, default: null }, // Place | null
   placeholder: { type: String, default: 'Town, city or address' },
   /** E1.2 — offered on the start field only. */
-  allowCurrentLocation: { type: Boolean, default: false }
+  allowCurrentLocation: { type: Boolean, default: false },
+  /**
+   * Prefer results near this place and in its country. Set on the end field
+   * from the confirmed start location, so a commute's destination ranks above
+   * a same-named place on another continent.
+   */
+  bias: { type: Object, default: null }
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -41,6 +47,18 @@ watch(query, (value) => {
   debounceTimer = setTimeout(() => search(value), DEBOUNCE_MS)
 })
 
+// If the start location is confirmed after the end has already been typed, the
+// candidates on screen were ranked without it. Re-rank rather than making the
+// user retype.
+watch(
+  () => props.bias?.countryCode,
+  (code) => {
+    if (code && !props.modelValue && query.value.trim().length >= MIN_CHARS) {
+      search(query.value)
+    }
+  }
+)
+
 function cancelInFlight() {
   controller?.abort()
   controller = null
@@ -56,7 +74,7 @@ async function search(value) {
 
   searching.value = true
   try {
-    const places = await geocode(value, { signal })
+    const places = await geocode(value, { signal, bias: props.bias })
     if (signal.aborted) return // a newer query has taken over
     candidates.value = places
     active.value = places.length ? 0 : -1
@@ -159,6 +177,9 @@ onBeforeUnmount(() => {
         <template v-else-if="candidates.length">
           {{ candidates.length }} match{{ candidates.length === 1 ? '' : 'es' }} — pick one, or
           use ↑ ↓ and Enter.
+        </template>
+        <template v-else-if="bias">
+          Type a place, then press Enter. Results near your start location come first.
         </template>
         <template v-else>Type a place, then press Enter to search.</template>
       </p>

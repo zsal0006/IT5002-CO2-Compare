@@ -13,7 +13,14 @@ Everything the client talks to, and the exact shape of each exchange.
 | `q` | the user's free text |
 | `format` | `jsonv2` |
 | `addressdetails` | `1` |
-| `limit` | `5` |
+| `limit` | `5`, or `10` when biasing (we re-rank, then trim) |
+| `viewbox` | `lon−3, lat+3, lon+3, lat−3` around the start location, when the end field is being searched |
+
+**Bias, not filter.** `viewbox` is sent *without* `bounded=1`, so it expresses a
+preference rather than a restriction, and results are then stable-sorted to put the
+start location's country first. A destination in another country still appears — it
+just ranks below local matches, so cross-border journeys keep working. `bounded=1`
+or `countrycodes=` would have made them impossible.
 
 **Usage policy** (https://operations.osmfoundation.org/policies/nominatim/): maximum
 one request per second, identify the application, cache results, no bulk use. We

@@ -66,11 +66,23 @@ function throttle(fn, signal) {
  */
 
 /**
+ * How far around the bias point Nominatim is asked to prefer results, in
+ * degrees. Roughly 330 km at the equator and less towards the poles — generous
+ * for a commute without being so wide it stops meaning anything.
+ */
+const BIAS_DEGREES = 3
+
+/**
  * Resolve free text to up to `limit` candidate places.
  * Returns [] when nothing matches. Throws only on network/server failure.
  *
  * @param {string} query
- * @param {{limit?: number, signal?: AbortSignal}} [options]
+ * @param {object} [options]
+ * @param {number} [options.limit]
+ * @param {AbortSignal} [options.signal]
+ * @param {Place|null} [options.bias] prefer results near this place and in its
+ *   country. Preference only — a destination in another country still appears,
+ *   just below the local matches, so cross-border journeys keep working.
  * @returns {Promise<Place[]>}
  */
 export async function geocode(query, options = {}) {
@@ -78,7 +90,10 @@ export async function geocode(query, options = {}) {
   if (q.length < 2) return []
 
   const limit = options.limit ?? 5
-  const cacheKey = `${q.toLowerCase()}|${limit}`
+  const bias = options.bias ?? null
+  // The bias changes the result order, so it has to be part of the cache key.
+  const biasKey = bias ? `${bias.countryCode}@${bias.lat.toFixed(2)},${bias.lon.toFixed(2)}` : '-'
+  const cacheKey = `${q.toLowerCase()}|${limit}|${biasKey}`
   if (cache.has(cacheKey)) return cache.get(cacheKey)
 
   const results = await throttle(async () => {
@@ -86,8 +101,19 @@ export async function geocode(query, options = {}) {
       q,
       format: 'jsonv2',
       addressdetails: '1',
-      limit: String(limit)
+      // Ask for more than we show when biasing: a local match can sit outside
+      // the top five of an unbiased relevance ranking.
+      limit: String(bias ? Math.max(limit * 2, 10) : limit)
     })
+
+    if (bias) {
+      const { lat, lon } = bias
+      // viewbox without bounded=1 is a preference, not a filter.
+      params.set(
+        'viewbox',
+        [lon - BIAS_DEGREES, lat + BIAS_DEGREES, lon + BIAS_DEGREES, lat - BIAS_DEGREES].join(',')
+      )
+    }
     const res = await fetch(`${ENDPOINT}?${params}`, {
       signal: options.signal,
       headers: { Accept: 'application/json', 'Accept-Language': 'en' },
@@ -95,11 +121,24 @@ export async function geocode(query, options = {}) {
     })
     if (!res.ok) throw new Error(`Geocoding failed (${res.status})`)
     const json = await res.json()
-    return json.map(toPlace)
+    return rank(json.map(toPlace), bias).slice(0, limit)
   }, options.signal)
 
   cache.set(cacheKey, results)
   return results
+}
+
+/**
+ * Put matches in the bias country first, keeping Nominatim's relevance order
+ * within each group (Array.sort is stable). Server-side viewbox preference is
+ * fuzzy, so this makes the country part explicit and predictable.
+ */
+function rank(places, bias) {
+  if (!bias?.countryCode || bias.countryCode === 'ZZ') return places
+  return [...places].sort(
+    (a, b) =>
+      (a.countryCode === bias.countryCode ? 0 : 1) - (b.countryCode === bias.countryCode ? 0 : 1)
+  )
 }
 
 function toPlace(raw) {
