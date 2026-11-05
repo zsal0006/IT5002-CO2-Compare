@@ -47,10 +47,26 @@ we write is SQL (tables, views, and two functions).
 
 ### Why no custom backend
 
-The only operation that genuinely must not be trusted to the client is computing
-"CO₂ saved" before it is written to the shared leaderboard. That is handled by a
-Postgres `SECURITY DEFINER` function (`log_trip`), which recomputes the saving from
-the stored emission factors. Everything else is a read of public reference data.
+"Backend" here means Supabase: Postgres, the REST API generated over it, row-level
+security, and three functions. There is no Node or Express tier to write or deploy.
+
+The business logic the brief describes — multiplying a distance by the emission
+factors — runs in the database:
+
+| Function | Does | Why it is server-side |
+|---|---|---|
+| `compare_journey(km, modes)` | kg CO₂e per mode for a journey | The brief's business logic. Factors never leave the database to be multiplied. |
+| `log_trip(km, mode, country, region)` | Records a trip and its saving | `SECURITY DEFINER`. The saving must not be computed by a client that could forge it. |
+| `country_series(code)` | A country's emissions by year | Keeps the dashboard query in one place. |
+
+Distance still comes from OSRM via the browser, because routing is an external
+service and proxying it through the database would add a hop without adding trust.
+
+`src/lib/emissions.js` holds a pure client implementation of the same arithmetic.
+It is the documented degraded mode for when `compare_journey` cannot be reached
+(NFR-7), and it covers the instant between toggling a return trip and the refetch
+landing — not a second source of truth. When Supabase answers, its figures are the
+ones displayed, and `trip.usingServerCompare` records which path produced them.
 
 ## 2.3 Request flows
 
