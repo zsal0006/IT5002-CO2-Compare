@@ -5,6 +5,7 @@ import LocationInput from '@/components/LocationInput.vue'
 import ComparisonChart from '@/components/ComparisonChart.vue'
 import ComparisonTable from '@/components/ComparisonTable.vue'
 import ModeSelector from '@/components/ModeSelector.vue'
+import BenefitCards from '@/components/BenefitCards.vue'
 import StatTile from '@/components/StatTile.vue'
 import { useTripStore } from '@/stores/trip'
 import { useFactorsStore } from '@/stores/factors'
@@ -23,6 +24,18 @@ const chosenMode = ref(null)
 onMounted(() => factorsStore.load())
 
 const carOptions = computed(() => factorsStore.factors.filter((f) => f.category === 'car'))
+
+/**
+ * Which mode the co-benefits describe: the one the user has picked, or — before
+ * they pick — the swap we are suggesting. Showing nothing until they choose
+ * would hide the argument at exactly the moment it is meant to persuade.
+ */
+const benefitMode = computed(() => {
+  if (chosenMode.value) {
+    return trip.allModes.find((m) => m.modeKey === chosenMode.value) ?? null
+  }
+  return trip.headlineSwap?.to ?? trip.best ?? null
+})
 
 const journeyTitle = computed(() => {
   if (!origin.value || !destination.value) return ''
@@ -116,6 +129,8 @@ async function onLog() {
             {{ trip.headlineSwap.to.label.toLowerCase() }} saves
             <strong>{{ formatCo2(trip.headlineSwap.savedKg) }}</strong> CO₂e.
           </p>
+
+          <BenefitCards :mode="benefitMode" :distance-km="trip.effectiveKm" />
 
           <ComparisonTable :results="trip.comparison" />
 

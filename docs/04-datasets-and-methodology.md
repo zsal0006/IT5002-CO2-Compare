@@ -101,6 +101,46 @@ a short hop, or a ferry) records a saving of zero rather than a negative — the
 leaderboard measures avoided emissions, not a net ledger. `emitted_g` is always
 recorded truthfully, so a net view can be added later without re-logging.
 
+## 4.3b Co-benefits
+
+A kilogram of CO₂ is not a unit anybody has intuition for. `src/lib/benefits.js`
+converts a journey into things people can picture. These are **framing, not
+measurement** — the Learn page says so, and each card can reveal its assumption.
+
+| Co-benefit | Formula | Constant | Basis |
+|---|---|---|---|
+| Calories | `MET × body mass (kg) × hours` | walking 3.5 MET @ 4.8 km/h; cycling 7.5 MET @ 15 km/h; 70 kg adult | Compendium of Physical Activities (Ainsworth et al.) |
+| Steps | `km × 1300` | 1,300 steps/km | Average adult stride ≈ 0.77 m |
+| Tree-days | `kg ÷ (21.8 ÷ 365)` | 21.8 kg CO₂/tree/year | US EPA Greenhouse Gas Equivalencies Calculator |
+| Petrol litres | `km × 6.8 ÷ 100` | 6.8 L/100 km; 2.31 kg CO₂/L | Typical medium petrol car |
+| Phone charges | `kg ÷ 0.0083` | 8.3 g CO₂e per charge | US EPA Greenhouse Gas Equivalencies Calculator |
+
+### Rules these follow
+
+1. Every constant is an average with a named basis. **None is a measurement of the
+   person reading it** — calories in particular depend on body mass, pace, terrain
+   and wind, and the card says so.
+2. **"Tree-days" is a time-to-absorb comparison, not an offset.** Nothing in this
+   app is sold, traded or claimed as a carbon credit, and the wording never implies
+   a journey has been neutralised.
+3. Figures round hard. Stating "254.7 kcal" would imply a precision the inputs do
+   not support.
+4. For a car, the cards state the cost of the trip rather than congratulating the
+   user. Celebrating a saving that was not made would be dishonest framing.
+
+> **Sprint 1, T-1.8.** These are well-known published figures but are not yet
+> verified against their primary sources. Confirm each one, add rows to
+> `data_sources`, and cite them on the Learn page — the same treatment the emission
+> factors get in T-1.3. Until that is done they are placeholders-with-provenance.
+
+### Why these live in code rather than the database
+
+Story 6.1 requires *emission factors* to come from the database, and they do. These
+are presentation-layer framing constants that do not vary by deployment and are
+never used in an emissions calculation. If the team reads 6.1 broadly, they should
+move to a `benefit_factors` table — raise it alongside the `fallbackFactors.js`
+question at the Sprint 1 review.
+
 ## 4.4 Known limitations
 
 To be reproduced verbatim on the Learn page:
@@ -115,6 +155,10 @@ To be reproduced verbatim on the Learn page:
 6. Walking and cycling are zero on an operational basis, not a lifecycle basis.
 7. Trip logs are unverified and unauthenticated; the aggregate indicates engagement,
    not audited emissions reduction.
+8. Co-benefit figures (calories, steps, tree-days, litres) are averages for an
+   assumed body mass and an assumed vehicle, not measurements of you or your car.
+9. "Tree-days" compares a quantity of CO₂ to a tree's absorption rate. It is not an
+   offset and nothing here is a carbon credit.
 
 ## 4.5 Data licensing
 
