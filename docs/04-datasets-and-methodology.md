@@ -131,6 +131,14 @@ number derived from an invented fare would be worse than publishing nothing.
 What we state instead is narrow and defensible, and the card's basis line spells
 out what is excluded: fares, parking, insurance, tax and wear.
 
+**Australia is the default market.** Currency, number formatting and the
+dashboard's opening country all default to Australia, and a trip starting
+somewhere without its own price row falls back to the AU row rather than to a
+global average — so a user who never leaves Australia never sees a foreign
+currency. These are defaults, not restrictions: a trip starting elsewhere uses
+that country's own row when one exists, and the defaults live in
+`src/lib/locale.js` so switching market is a one-file change.
+
 Pump prices live in the `fuel_prices` table rather than in code — a litre costs
 roughly ten times more in the UK than in Kuwait, so a single constant would be
 wrong almost everywhere. Each row carries `updated_on`, and the UI shows that
@@ -180,7 +188,8 @@ To be reproduced verbatim on the Learn page:
    assumed body mass and an assumed vehicle, not measurements of you or your car.
 9. "Tree-days" compares a quantity of CO₂ to a tree's absorption rate. It is not an
    offset and nothing here is a carbon credit.
-10. Money shown is fuel cost only, at an indicative pump price stamped with the date
+10. Money shown is fuel cost only, in Australian dollars unless the trip starts in
+    another listed country, at an indicative pump price stamped with the date
     it was recorded. It is not a net saving: any fare you paid instead is not
     subtracted, and parking, insurance, tax and wear are not included.
 

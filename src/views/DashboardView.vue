@@ -5,11 +5,12 @@ import EmissionsTimeSeries from '@/components/EmissionsTimeSeries.vue'
 import WorldEmissionsMap from '@/components/WorldEmissionsMap.vue'
 import { useCountriesStore } from '@/stores/countries'
 import { formatNumber, formatPercent } from '@/lib/format'
+import { DEFAULT_COUNTRY_A3 } from '@/lib/locale'
 
 /** E5 — national transport emissions: the scale of the problem, by country. */
 const countries = useCountriesStore()
 
-const selected = ref('GBR')
+const selected = ref(DEFAULT_COUNTRY_A3)
 
 onMounted(async () => {
   await Promise.all([countries.loadList(), countries.loadSnapshot()])

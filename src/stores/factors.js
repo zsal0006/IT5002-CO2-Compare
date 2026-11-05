@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
 import { FALLBACK_FACTORS, FALLBACK_FUEL_PRICE } from '@/lib/fallbackFactors'
+import { DEFAULT_COUNTRY_A2 } from '@/lib/locale'
 
 /**
  * Emission factors and their sources. Fetched once per session; the calculator
@@ -21,12 +22,17 @@ export const useFactorsStore = defineStore('factors', () => {
     Object.fromEntries(factors.value.map((f) => [f.mode_key, f]))
   )
 
-  /** Pump price for a country, falling back to the global ZZ row. */
+  /**
+   * Pump price for a country. Australia is the default market, so an unknown
+   * country falls back to the AU row before the generic ZZ one — both are AUD,
+   * but AU is the figure we actually maintain.
+   */
   function fuelPriceFor(countryCode) {
     const rows = fuelPrices.value
     if (!rows.length) return FALLBACK_FUEL_PRICE
     return (
       rows.find((r) => r.country_code === countryCode) ??
+      rows.find((r) => r.country_code === DEFAULT_COUNTRY_A2) ??
       rows.find((r) => r.country_code === 'ZZ') ??
       FALLBACK_FUEL_PRICE
     )

@@ -1,7 +1,8 @@
 /** Display formatting. Kept in one place so units read the same everywhere. */
+import { LOCALE } from './locale.js'
 
 const nf = (digits) =>
-  new Intl.NumberFormat('en-GB', { minimumFractionDigits: digits, maximumFractionDigits: digits })
+  new Intl.NumberFormat(LOCALE, { minimumFractionDigits: digits, maximumFractionDigits: digits })
 
 /** kg CO2e, scaled to a sensible unit. 0.42 kg -> "420 g"; 1240 kg -> "1.24 t". */
 export function formatCo2(kg) {
@@ -30,7 +31,7 @@ export function formatPercent(pct) {
 
 const regionNames =
   typeof Intl.DisplayNames === 'function'
-    ? new Intl.DisplayNames(['en'], { type: 'region' })
+    ? new Intl.DisplayNames([LOCALE], { type: 'region' })
     : null
 
 /** 'GB' -> 'United Kingdom'. Falls back to the code itself. */

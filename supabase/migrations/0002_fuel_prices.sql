@@ -5,6 +5,11 @@
 -- costs roughly ten times more in the UK than in Kuwait. A single hard-coded
 -- figure would be wrong almost everywhere, so prices live here, keyed by
 -- country, each stamped with the date it was recorded.
+--
+-- AUSTRALIA IS THE DEFAULT MARKET. Prices and currency fall back to AUD at the
+-- Australian pump price when a trip starts somewhere without its own row, so a
+-- user who never leaves Australia sees AUD throughout and an unrecognised
+-- location does not silently switch them to another currency.
 
 create table if not exists public.fuel_prices (
   country_code    char(2) primary key,
@@ -52,8 +57,9 @@ insert into public.fuel_prices (country_code, currency_code, price_per_litre, fu
   ('DE', 'EUR', 1.7500, 'Petrol (E10)',         'pump-prices'),
   ('FR', 'EUR', 1.7500, 'Petrol (SP95)',        'pump-prices'),
   ('IN', 'INR', 105.0000, 'Petrol',             'pump-prices'),
-  -- Global fallback, used when the start country has no row of its own.
-  ('ZZ', 'USD', 1.2000, 'Petrol (95)',          'pump-prices')
+  -- Default market fallback: Australian price and currency, used when a trip's
+  -- start country has no row of its own.
+  ('ZZ', 'AUD', 1.9500, 'Petrol (unleaded 91)', 'pump-prices')
 on conflict (country_code) do update set
   currency_code   = excluded.currency_code,
   price_per_litre = excluded.price_per_litre,
@@ -67,6 +73,12 @@ do $guard$
 begin
   if not exists (select 1 from public.fuel_prices where country_code = 'ZZ') then
     raise exception 'No ZZ fallback row in fuel_prices; the money co-benefit would vanish outside the listed countries.';
+  end if;
+  if not exists (select 1 from public.fuel_prices where country_code = 'AU') then
+    raise exception 'No AU row in fuel_prices; Australia is the default market.';
+  end if;
+  if (select currency_code from public.fuel_prices where country_code = 'ZZ') <> 'AUD' then
+    raise exception 'The ZZ fallback must be AUD — Australia is the default market.';
   end if;
 end;
 $guard$;

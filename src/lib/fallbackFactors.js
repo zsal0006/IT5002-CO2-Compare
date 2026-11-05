@@ -22,13 +22,14 @@ export const FALLBACK_FACTORS = [
 ]
 
 /**
- * Global fallback pump price, used only when `fuel_prices` cannot be read.
- * Mirrors the ZZ row in supabase/migrations/0002_fuel_prices.sql.
+ * Fallback pump price, used only when `fuel_prices` cannot be read.
+ * Australia is the default market, so this mirrors the ZZ row in
+ * supabase/migrations/0002_fuel_prices.sql — AUD at the Australian price.
  */
 export const FALLBACK_FUEL_PRICE = {
   country_code: 'ZZ',
-  currency_code: 'USD',
-  price_per_litre: 1.2,
-  fuel_label: 'Petrol (95)',
+  currency_code: 'AUD',
+  price_per_litre: 1.95,
+  fuel_label: 'Petrol (unleaded 91)',
   updated_on: null
 }

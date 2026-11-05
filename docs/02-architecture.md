@@ -31,6 +31,14 @@ we write is SQL (tables, views, and two functions).
                         └──────────────────────────────────────┘
 ```
 
+### Default market
+
+Australia. `src/lib/locale.js` holds the country codes, locale and currency that
+everything falls back to when a trip's own location cannot supply them — the
+dashboard's opening country, number and date formatting, and the fuel price used
+for the money co-benefit. Switching market is a one-file change; nothing else
+hard-codes a country.
+
 ## 2.2 Technology choices and rationale
 
 | Layer | Choice | Why |

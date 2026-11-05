@@ -25,6 +25,7 @@
  * `data_sources` before submission, exactly as the emission factors were.
  * ---------------------------------------------------------------------------
  */
+import { LOCALE, DEFAULT_CURRENCY } from './locale.js'
 
 /** Assumed body mass for the energy calculation, kg. */
 export const ASSUMED_BODY_KG = 70
@@ -71,9 +72,9 @@ export function fuelCostFor(km, price) {
 }
 
 /** Format an amount in its own currency, without inventing precision. */
-export function formatMoney(amount, currencyCode) {
+export function formatMoney(amount, currencyCode = DEFAULT_CURRENCY) {
   try {
-    return new Intl.NumberFormat('en-GB', {
+    return new Intl.NumberFormat(LOCALE, {
       style: 'currency',
       currency: currencyCode,
       currencyDisplay: 'code',
@@ -118,7 +119,7 @@ function round(value, step) {
   return Math.round(value / step) * step
 }
 
-const int = (n) => new Intl.NumberFormat('en-GB').format(Math.round(n))
+const int = (n) => new Intl.NumberFormat(LOCALE).format(Math.round(n))
 
 /**
  * Build the co-benefit cards for one mode on one journey.
