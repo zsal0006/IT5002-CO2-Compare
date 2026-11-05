@@ -30,6 +30,9 @@ const carOptions = computed(() => factorsStore.factors.filter((f) => f.category 
  * they pick — the swap we are suggesting. Showing nothing until they choose
  * would hide the argument at exactly the moment it is meant to persuade.
  */
+/** Pump price for the country the trip starts in (E4-adjacent, not stored). */
+const fuelPrice = computed(() => factorsStore.fuelPriceFor(origin.value?.countryCode ?? 'ZZ'))
+
 const benefitMode = computed(() => {
   if (chosenMode.value) {
     return trip.allModes.find((m) => m.modeKey === chosenMode.value) ?? null
@@ -130,7 +133,11 @@ async function onLog() {
             <strong>{{ formatCo2(trip.headlineSwap.savedKg) }}</strong> CO₂e.
           </p>
 
-          <BenefitCards :mode="benefitMode" :distance-km="trip.effectiveKm" />
+          <BenefitCards
+            :mode="benefitMode"
+            :distance-km="trip.effectiveKm"
+            :fuel-price="fuelPrice"
+          />
 
           <ComparisonTable :results="trip.comparison" />
 

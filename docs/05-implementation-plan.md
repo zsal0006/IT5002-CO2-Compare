@@ -40,6 +40,7 @@ Legend: **M** = must-have, **S** = should-have, **X** = stretch.
 | T-1.6 | Build the `factors` Pinia store with a bundled fallback table for offline/Supabase-down. | M |
 | T-1.7 | Write `log_trip()` and `country_series()`; unit-test them in the SQL editor. | M |
 | T-1.8 | Verify every co-benefit constant in `lib/benefits.js` against its primary source; add `data_sources` rows and cite them on the Learn page. | S |
+| T-1.9 | Replace the indicative pump prices in `0002_fuel_prices.sql` with checked figures from each national regulator; set `updated_on`. | S |
 
 **Done when:** `select count(*) from country_transport_emissions` returns a plausible number, every factor row has a non-null `source_id`, and an unauthorised insert fails.
 

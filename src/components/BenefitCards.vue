@@ -12,10 +12,12 @@ import { benefitsFor } from '@/lib/benefits'
 const props = defineProps({
   /** A single ModeResult from lib/emissions.compare(). */
   mode: { type: Object, default: null },
-  distanceKm: { type: Number, default: null }
+  distanceKm: { type: Number, default: null },
+  /** Pump price for the trip's start country; omit to drop the money card. */
+  fuelPrice: { type: Object, default: null }
 })
 
-const benefits = computed(() => benefitsFor(props.mode, props.distanceKm))
+const benefits = computed(() => benefitsFor(props.mode, props.distanceKm, props.fuelPrice))
 const showBasis = ref(false)
 </script>
 

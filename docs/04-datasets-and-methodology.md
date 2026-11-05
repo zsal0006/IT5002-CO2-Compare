@@ -114,6 +114,27 @@ measurement** — the Learn page says so, and each card can reveal its assumptio
 | Tree-days | `kg ÷ (21.8 ÷ 365)` | 21.8 kg CO₂/tree/year | US EPA Greenhouse Gas Equivalencies Calculator |
 | Petrol litres | `km × 6.8 ÷ 100` | 6.8 L/100 km; 2.31 kg CO₂/L | Typical medium petrol car |
 | Phone charges | `kg ÷ 0.0083` | 8.3 g CO₂e per charge | US EPA Greenhouse Gas Equivalencies Calculator |
+| Money | `litres × price per litre` | `fuel_prices` table, by country | National regulators / GlobalPetrolPrices |
+
+### Why "money saved" is fuel only
+
+The money card states **the fuel a car would have burned, that you did not buy**.
+It is not a net saving, and it deliberately does not subtract the fare or ticket
+you paid instead.
+
+We have no fare data — fares vary by operator, time of day, ticket type and
+railcard, and no open dataset covers them globally. A "net saving" built on a
+guessed fare would frequently be *negative*: in the UK a rail fare routinely
+exceeds the petrol cost for the same journey. Publishing a confident negative
+number derived from an invented fare would be worse than publishing nothing.
+
+What we state instead is narrow and defensible, and the card's basis line spells
+out what is excluded: fares, parking, insurance, tax and wear.
+
+Pump prices live in the `fuel_prices` table rather than in code — a litre costs
+roughly ten times more in the UK than in Kuwait, so a single constant would be
+wrong almost everywhere. Each row carries `updated_on`, and the UI shows that
+date rather than implying the price is live. A `ZZ` row is the global fallback.
 
 ### Rules these follow
 
@@ -159,6 +180,9 @@ To be reproduced verbatim on the Learn page:
    assumed body mass and an assumed vehicle, not measurements of you or your car.
 9. "Tree-days" compares a quantity of CO₂ to a tree's absorption rate. It is not an
    offset and nothing here is a carbon credit.
+10. Money shown is fuel cost only, at an indicative pump price stamped with the date
+    it was recorded. It is not a net saving: any fare you paid instead is not
+    subtracted, and parking, insurance, tax and wear are not included.
 
 ## 4.5 Data licensing
 

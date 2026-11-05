@@ -53,6 +53,37 @@ const TREE_KG_PER_YEAR = 21.8
 const PETROL_KG_PER_LITRE = 2.31
 const CAR_LITRES_PER_100KM = 6.8
 
+/**
+ * Fuel cost for `km` at a given pump price.
+ *
+ * Deliberately fuel ONLY. We have no fare data, so a "net saving" against a bus
+ * ticket or rail fare would be a number we cannot support — and it would often
+ * be negative, since a train fare frequently exceeds the petrol for the same
+ * trip. What this states is narrower and defensible: the fuel a car would have
+ * burned, which you did not buy. The card says so, and the Learn page repeats it.
+ *
+ * @param {number} km
+ * @param {{price_per_litre:number, currency_code:string}} price
+ */
+export function fuelCostFor(km, price) {
+  if (!price || !Number.isFinite(km) || km <= 0) return 0
+  return litresFor(km) * Number(price.price_per_litre)
+}
+
+/** Format an amount in its own currency, without inventing precision. */
+export function formatMoney(amount, currencyCode) {
+  try {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: currencyCode,
+      currencyDisplay: 'code',
+      maximumFractionDigits: amount < 10 ? 2 : 0
+    }).format(amount)
+  } catch {
+    return `${amount.toFixed(2)} ${currencyCode}`
+  }
+}
+
 /** Charging a smartphone once, kg CO₂e. Basis: US EPA equivalencies. */
 const PHONE_CHARGE_KG = 0.0083
 
@@ -94,9 +125,12 @@ const int = (n) => new Intl.NumberFormat('en-GB').format(Math.round(n))
  *
  * @param {{modeKey:string, label:string, category:string, kg:number, savedVsBaselineKg:number}} mode
  * @param {number} km distance for the journey as calculated
- * @returns {Benefit[]} at most three, most persuasive first
+ * @param {{price_per_litre:number, currency_code:string, updated_on?:string}|null} [price]
+ *   pump price for the trip's start country. Omit and the money card is simply
+ *   left out rather than guessed at.
+ * @returns {Benefit[]} at most four, most persuasive first
  */
-export function benefitsFor(mode, km) {
+export function benefitsFor(mode, km, price = null) {
   if (!mode || !Number.isFinite(km) || km <= 0) return []
 
   const out = []
@@ -125,6 +159,21 @@ export function benefitsFor(mode, km) {
 
   // --- Anything that beats the car ----------------------------------------
   if (saved > 0.01) {
+    if (price && mode.category !== 'car') {
+      const cost = fuelCostFor(km, price)
+      if (cost > 0) {
+        out.push({
+          key: 'money',
+          headline: formatMoney(cost, price.currency_code),
+          detail: 'Fuel a car would have used, that you did not buy.',
+          basis:
+            `Fuel only, at ${formatMoney(Number(price.price_per_litre), price.currency_code)} per litre` +
+            `${price.updated_on ? ` as at ${price.updated_on}` : ''}. ` +
+            'Excludes any fare or ticket you paid instead, and excludes tax, parking, insurance and wear.'
+        })
+      }
+    }
+
     const days = round(treeDaysFor(saved), 1)
     out.push({
       key: 'trees',
@@ -155,6 +204,21 @@ export function benefitsFor(mode, km) {
       detail: 'Petrol burned on this trip.',
       basis: `Assumes ${CAR_LITRES_PER_100KM} L/100 km. An electric car burns none, but its electricity is not free of carbon.`
     })
+    if (price) {
+      const cost = fuelCostFor(km, price)
+      if (cost > 0) {
+        out.push({
+          key: 'money-spent',
+          headline: formatMoney(cost, price.currency_code),
+          detail: 'Fuel for this trip, at local pump prices.',
+          basis:
+            `At ${formatMoney(Number(price.price_per_litre), price.currency_code)} per litre` +
+            `${price.updated_on ? ` as at ${price.updated_on}` : ''}. ` +
+            'Fuel only — parking, insurance, tax and wear are on top.'
+        })
+      }
+    }
+
     out.push({
       key: 'charges',
       headline: `${int(mode.kg / PHONE_CHARGE_KG)} phone charges`,
@@ -174,7 +238,7 @@ export function benefitsFor(mode, km) {
     })
   }
 
-  return out.slice(0, 3)
+  return out.slice(0, 4)
 }
 
 function formatKgShort(kg) {

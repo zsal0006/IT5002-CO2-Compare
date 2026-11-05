@@ -20,3 +20,15 @@ export const FALLBACK_FACTORS = [
   { mode_key: 'car_petrol',     mode_label: 'Petrol car',            category: 'car',              factor_g_per_pkm: 170, is_baseline: false, display_order: 13 },
   { mode_key: 'car_diesel',     mode_label: 'Diesel car',            category: 'car',              factor_g_per_pkm: 171, is_baseline: false, display_order: 14 }
 ]
+
+/**
+ * Global fallback pump price, used only when `fuel_prices` cannot be read.
+ * Mirrors the ZZ row in supabase/migrations/0002_fuel_prices.sql.
+ */
+export const FALLBACK_FUEL_PRICE = {
+  country_code: 'ZZ',
+  currency_code: 'USD',
+  price_per_litre: 1.2,
+  fuel_label: 'Petrol (95)',
+  updated_on: null
+}
