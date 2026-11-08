@@ -42,7 +42,7 @@ VITE_APP_CONTACT=your-team-email@example.ac.uk
 
 4. **SQL Editor → New query**: paste and run, in this order:
    - `supabase/migrations/0001_init.sql`
-   - `supabase/seed/0002_seed_sources_and_factors.sql`
+   - `supabase/seed/0100_seed_sources_and_factors.sql`
 5. Restart `npm run dev` — Vite only reads `.env.local` at startup.
 
 > The `anon` key is designed to be public and ships in the client bundle. It is safe
@@ -52,17 +52,61 @@ VITE_APP_CONTACT=your-team-email@example.ac.uk
 
 ## 6.4 Load the country emissions dataset
 
-1. Download the GIZ dataset from
-   https://portal.transport-data.org/@giz/country-level-yearly-ghg-emissions-transport-sector-1970-2024
-2. Save it as `data/country_transport_emissions.csv` (git-ignored under `data/raw/`
-   if it is large).
-3. Inspect the header row. Rename columns to match the staging table:
-   `country_code, country_name, year, transport_mt_co2e, total_mt_co2e`.
-4. In Supabase: **Table editor → `staging_country_emissions` → Import data from CSV**.
-5. Run `supabase/seed/0003_load_country_emissions.sql` and work through its numbered
-   comment blocks — it checks what arrived before writing to the real table.
-6. Run `missingAlpha2()` from `src/lib/iso.js` against the distinct country codes and
-   add anything it reports.
+Sprint 1, T-1.1. Until this is done the Dashboard and the world map have nothing
+to show.
+
+### 1. Download
+
+From https://portal.transport-data.org/@giz/country-level-yearly-ghg-emissions-transport-sector-1970-2024
+Save the CSV anywhere under `data/raw/` — that folder is git-ignored, so the raw
+download never reaches the repository.
+
+### 2. Normalise
+
+```bash
+node scripts/prepare-country-emissions.mjs
+```
+
+The script finds the one CSV in `data/raw/`, works out which source column feeds
+each of ours, and writes `data/country_transport_emissions.csv` with exactly the
+five columns `staging_country_emissions` expects.
+
+**Read what it prints.** It reports the column mapping it chose and how many rows
+it skipped and why. A wrong guess is visible here, before anything reaches the
+database. If a column shows `*** NOT FOUND ***`, add the real header name to the
+`MAPPING` object at the top of the script and run it again.
+
+```bash
+node scripts/prepare-country-emissions.mjs --inspect   # headers only, writes nothing
+node scripts/prepare-country-emissions.mjs --in data/raw/other.csv
+```
+
+Expect roughly 190 countries across 1970–2024. Rows skipped for lacking a
+three-letter ISO code are usually aggregates such as `WORLD` or `EU27`.
+
+### 3. Import into staging
+
+Supabase Studio → **Table editor** → `staging_country_emissions` → **Import data
+from CSV** → upload `data/country_transport_emissions.csv`.
+
+The columns already match by name, so there is nothing to map by hand. Loading
+into staging rather than the real table means a bad file cannot corrupt
+`country_transport_emissions`, and the generated `transport_share_pct` column
+stays out of the way.
+
+### 4. Move it across
+
+Run `supabase/seed/0101_load_country_emissions.sql` and work through its numbered
+comment blocks: check what arrived, insert with `on conflict do update`, verify a
+few countries against the portal, then clear staging.
+
+### 5. Reconcile the map
+
+```sql
+select distinct country_code from country_transport_emissions order by 1;
+```
+
+Anything with no matching boundary feature renders unshaded (task T-4.10).
 
 ## 6.4b Country boundaries (already vendored)
 

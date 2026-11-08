@@ -171,7 +171,7 @@ Returns the year/transport/total/share series for one country, ordered by year.
 
 | File | Contents |
 |------|----------|
-| `supabase/seed/0002_seed_sources_and_factors.sql` | `data_sources` + ~15 `emission_factors` rows |
+| `supabase/seed/0100_seed_sources_and_factors.sql` | `data_sources` + ~15 `emission_factors` rows |
 | `supabase/seed/0003_seed_country_emissions.sql` | loader for `data/country_transport_emissions.csv` |
 | `data/emission_factors.csv` | human-editable source of truth for the factors |
 
