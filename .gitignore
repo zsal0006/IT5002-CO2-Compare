@@ -12,3 +12,8 @@ dist-ssr/
 *.log
 npm-debug.log*
 data/raw/
+
+# Binary deliverables (pitch decks, exported reports). Kept in OneDrive, where
+# co-editing works - git cannot diff them and would store a fresh copy per edit.
+*.pptx
+*.docx
