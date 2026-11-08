@@ -77,7 +77,7 @@ Legend: **M** = must-have, **S** = should-have, **X** = stretch.
 
 | # | Task | Pri |
 |---|------|-----|
-| T-3.1 | `ModeSelector.vue` — pick the mode actually used. | M |
+| T-3.1 | `TripLogger.vue` — pick the mode actually used, as an icon grid. | M |
 | T-3.2 | Call `log_trip` RPC; optimistic UI with rollback on error. | M |
 | T-3.3 | Derive the ISO-2 country code **and the region** from the start geocode result (`address.country_code`, `address.state`). *(stories 4.1, 6.2)* | M |
 | T-3.4 | `stats` store reading `v_savings_global` and `v_savings_by_country`. | M |

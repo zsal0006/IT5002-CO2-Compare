@@ -16,7 +16,7 @@ Where this document and `01-requirements.md` disagree, **the user stories win**;
 |----|------|-----------|
 | E1 | Route input | `CompareView` form, `lib/geocode.js`, `lib/routing.js` |
 | E2 | Emissions comparison | `lib/emissions.js`, `ComparisonChart`, `ComparisonTable`, `LearnView` |
-| E3 | Savings tracking | `ModeSelector`, `log_trip()` |
+| E3 | Savings tracking | `TripLogger`, `log_trip()` |
 | E4 | Community impact | `ImpactView`, `v_savings_by_region`, `v_savings_by_mode` |
 | E5 | Emissions dashboard | `DashboardView`, `EmissionsTimeSeries`, `WorldEmissionsMap` |
 | E6 | Data, privacy and platform | Schema + RLS, `theme.css`, responsive layouts |
@@ -34,7 +34,7 @@ Task is the sprint task in `05-implementation-plan.md`.
 | 2.2 Saving versus driving | M | FR-22 | T-2.11 | `lib/emissions.js` → `savedKg()`, `trip.headlineSwap` | Scaffolded |
 | 2.3 Choose vehicle type | C | FR-6 | T-2.8 | `CompareView` vehicle select, `trip.carMode` | Scaffolded |
 | 2.4 Where the numbers come from | S | FR-20 | T-5.1 | "How we calculate this" → `LearnView.vue` | Scaffolded |
-| 3.1 Pick the way I travelled | M | FR-9, FR-10, FR-11 | T-3.1, T-3.2 | `ModeSelector.vue`, `log_trip()` | Scaffolded |
+| 3.1 Pick the way I travelled | M | FR-9, FR-10, FR-11 | T-3.1, T-3.2 | `TripLogger.vue`, `log_trip()` | Scaffolded |
 | 4.1 Region and global totals | M | FR-14, FR-15, FR-23 | T-3.3, T-3.4, T-4.8 | `ImpactView.vue`, `v_savings_by_region` | Scaffolded |
 | 4.2 Savings by transport mode | S | FR-24 | T-4.5 | `v_savings_by_mode`, `BarList.vue` | Scaffolded |
 | 5.1 Country transport emissions and share | M | FR-16, FR-18 | T-4.1, T-4.3 | `DashboardView` tiles, `country_series()` | Scaffolded |

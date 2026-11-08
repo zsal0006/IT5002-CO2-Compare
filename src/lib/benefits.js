@@ -6,7 +6,9 @@
  * tree would need to absorb the difference.
  *
  * Pure functions, no I/O, so they are directly unit-testable like
- * `lib/emissions.js`.
+ * `lib/emissions.js`. Nothing here decides a colour or a layout — the tiles and
+ * the pictogram panel do that from the `tone` and `unitLadder` each metric
+ * carries.
  *
  * ---------------------------------------------------------------------------
  * HONESTY RULES, which the Learn page repeats:
@@ -19,6 +21,9 @@
  *    sold, traded or claimed as a carbon credit.
  * 4. Never state a co-benefit with more precision than the input deserves —
  *    these round hard on purpose.
+ * 5. A figure scaled to a week or a year is a PROJECTION, not a measurement.
+ *    `lib/timeframe.js` holds that arithmetic and its caption always states
+ *    the trip count assumed.
  *
  * SPRINT 1 (T-1.8): every constant here is a well-known published figure, but
  * the team must confirm each against its primary source and record it in
@@ -35,24 +40,56 @@ export const ASSUMED_BODY_KG = 70
  * MET values follow the Compendium of Physical Activities (Ainsworth et al.).
  * kcal ≈ MET × body mass (kg) × hours.
  */
-const ACTIVE_PROFILE = {
+export const ACTIVE_PROFILE = {
   walking: { met: 3.5, kmh: 4.8, label: 'walking at a normal pace' },
   cycling: { met: 7.5, kmh: 15, label: 'cycling at a steady pace' }
 }
 
 /** Steps per kilometre at an average adult stride (~0.77 m). */
-const STEPS_PER_KM = 1300
+export const STEPS_PER_KM = 1300
+
+/** A widely used daily step target, for the steps card's context line. */
+export const DAILY_STEP_GOAL = 10000
 
 /**
  * CO₂ a mature tree absorbs in a year, kg. Basis: US EPA Greenhouse Gas
  * Equivalencies Calculator. Used only to express "how long would a tree need",
  * never as an offset claim.
  */
-const TREE_KG_PER_YEAR = 21.8
+export const TREE_KG_PER_YEAR = 21.8
 
 /** Petrol: kg CO₂ per litre burned, and a typical car's consumption. */
-const PETROL_KG_PER_LITRE = 2.31
-const CAR_LITRES_PER_100KM = 6.8
+export const PETROL_KG_PER_LITRE = 2.31
+export const CAR_LITRES_PER_100KM = 6.8
+
+/** Charging a smartphone once, kg CO₂e. Basis: US EPA equivalencies. */
+export const PHONE_CHARGE_KG = 0.0083
+
+// --------------------------------------------------------------- primitives
+
+/** Energy burned travelling `km` under its own power, in kcal. */
+export function caloriesFor(modeKey, km, bodyKg = ASSUMED_BODY_KG) {
+  const profile = ACTIVE_PROFILE[modeKey]
+  if (!profile || !Number.isFinite(km) || km <= 0) return 0
+  return profile.met * bodyKg * (km / profile.kmh)
+}
+
+/** kcal per kilometre for an active mode, 0 for everything else. */
+export function caloriesPerKm(modeKey, bodyKg = ASSUMED_BODY_KG) {
+  return caloriesFor(modeKey, 1, bodyKg)
+}
+
+/** Days a mature tree would need to absorb `kg` of CO₂. */
+export function treeDaysFor(kg) {
+  if (!Number.isFinite(kg) || kg <= 0) return 0
+  return kg / (TREE_KG_PER_YEAR / 365)
+}
+
+/** Litres of petrol a car would burn over `km`. */
+export function litresFor(km) {
+  if (!Number.isFinite(km) || km <= 0) return 0
+  return (km * CAR_LITRES_PER_100KM) / 100
+}
 
 /**
  * Fuel cost for `km` at a given pump price.
@@ -61,15 +98,14 @@ const CAR_LITRES_PER_100KM = 6.8
  * ticket or rail fare would be a number we cannot support — and it would often
  * be negative, since a train fare frequently exceeds the petrol for the same
  * trip. What this states is narrower and defensible: the fuel a car would have
- * burned, which you did not buy. The card says so, and the Learn page repeats it.
- *
- * @param {number} km
- * @param {{price_per_litre:number, currency_code:string}} price
+ * burned, which you did not buy. The tile says so, and the Learn page repeats it.
  */
 export function fuelCostFor(km, price) {
   if (!price || !Number.isFinite(km) || km <= 0) return 0
   return litresFor(km) * Number(price.price_per_litre)
 }
+
+// --------------------------------------------------------------- formatting
 
 /** Format an amount in its own currency, without inventing precision. */
 export function formatMoney(amount, currencyCode = DEFAULT_CURRENCY) {
@@ -85,133 +121,202 @@ export function formatMoney(amount, currencyCode = DEFAULT_CURRENCY) {
   }
 }
 
-/** Charging a smartphone once, kg CO₂e. Basis: US EPA equivalencies. */
-const PHONE_CHARGE_KG = 0.0083
-
-/**
- * @typedef {object} Benefit
- * @property {string} key
- * @property {string} headline  the number, already formatted
- * @property {string} detail    what it means, one short line
- * @property {string} basis     the assumption, shown as a footnote
- */
-
-/** Energy burned travelling `km` under its own power, in kcal. */
-export function caloriesFor(modeKey, km, bodyKg = ASSUMED_BODY_KG) {
-  const profile = ACTIVE_PROFILE[modeKey]
-  if (!profile || !Number.isFinite(km) || km <= 0) return 0
-  return profile.met * bodyKg * (km / profile.kmh)
-}
-
-/** Days a mature tree would need to absorb `kg` of CO₂. */
-export function treeDaysFor(kg) {
-  if (!Number.isFinite(kg) || kg <= 0) return 0
-  return kg / (TREE_KG_PER_YEAR / 365)
-}
-
-/** Litres of petrol a car would burn over `km`. */
-export function litresFor(km) {
-  if (!Number.isFinite(km) || km <= 0) return 0
-  return (km * CAR_LITRES_PER_100KM) / 100
-}
-
-function round(value, step) {
-  return Math.round(value / step) * step
-}
-
 const int = (n) => new Intl.NumberFormat(LOCALE).format(Math.round(n))
 
+function plural(n, word) {
+  return `${int(n)} ${word}${Math.round(n) === 1 ? '' : 's'}`
+}
+
+/** Tree-days become tree-years once the number stops being imaginable. */
+function formatTreeTime(days) {
+  if (days < 1) return 'Under a tree-day'
+  if (days < 365) return plural(days, 'tree-day')
+  return `${(days / 365).toFixed(1)} tree-years`
+}
+
+function formatLitres(litres) {
+  const digits = litres < 10 ? 1 : 0
+  return `${new Intl.NumberFormat(LOCALE, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits
+  }).format(litres)} litres`
+}
+
+// ------------------------------------------------------------- the metrics
+
 /**
- * Build the co-benefit cards for one mode on one journey.
+ * @typedef {object} BenefitMetric
+ * @property {string} key        money | tree | fuel | steps | kcal
+ * @property {number} value      the raw number, for the pictogram's arithmetic
+ * @property {string} formatted  the same number for a human
+ * @property {string} label      what it is, one line, on the tile
+ * @property {string} title      the heading the pictogram panel uses
+ * @property {string} basis      the assumption behind it
+ * @property {'series-1'|'accent'|'neutral'|'warm'} tone  which swatch the tile wears
+ * @property {number[]} unitLadder  candidate "one glyph = N" steps, ascending
+ * @property {(unit:number)=>string} unitLabel  how to caption the chosen step
+ */
+
+/**
+ * Candidate denominations for one pictogram glyph. The panel walks each ladder
+ * upward and takes the first step that keeps the row under forty glyphs — forty
+ * being roughly where a reader stops counting and starts estimating, which is
+ * the moment the pictogram has stopped doing its job.
+ */
+const UNIT_LADDERS = {
+  money: [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 500, 1000],
+  tree: [1, 2, 5, 10, 30, 73, 182.5, 365, 730, 1825, 3650],
+  fuel: [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 50, 100, 500],
+  steps: [500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 500000],
+  kcal: [25, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 50000]
+}
+
+/**
+ * Every co-benefit of taking `mode` instead of the baseline, scaled to `trips`.
  *
  * @param {{modeKey:string, label:string, category:string, kg:number, savedVsBaselineKg:number}} mode
- * @param {number} km distance for the journey as calculated
- * @param {{price_per_litre:number, currency_code:string, updated_on?:string}|null} [price]
- *   pump price for the trip's start country. Omit and the money card is simply
- *   left out rather than guessed at.
- * @returns {Benefit[]} at most four, most persuasive first
+ * @param {number} km distance of ONE journey, as calculated
+ * @param {object} [options]
+ * @param {number} [options.trips=1] how many such journeys the timeframe holds
+ * @param {{price_per_litre:number, currency_code:string, updated_on?:string}|null} [options.price]
+ *   pump price for the trip's start country. Omit and the money metric is left
+ *   out rather than guessed at.
+ * @param {string} [options.caption] the timeframe's assumption, for titles
+ * @returns {BenefitMetric[]}
  */
-export function benefitsFor(mode, km, price = null) {
+export function benefitMetrics(mode, km, options = {}) {
   if (!mode || !Number.isFinite(km) || km <= 0) return []
 
+  const { trips = 1, price = null, caption = '' } = options
+  const n = Number.isFinite(trips) && trips > 0 ? trips : 1
+  const saved = (mode.savedVsBaselineKg ?? 0) * n
+  const totalKm = km * n
+  const suffix = caption ? ` ${caption}` : ''
+
   const out = []
-  const saved = mode.savedVsBaselineKg ?? 0
 
-  // --- Active travel: the health case is stronger than the carbon one -------
-  if (mode.category === 'active') {
-    const kcal = caloriesFor(mode.modeKey, km)
-    if (kcal >= 10) {
-      out.push({
-        key: 'calories',
-        headline: `${int(round(kcal, 5))} kcal`,
-        detail: `Burned ${ACTIVE_PROFILE[mode.modeKey].label} this distance.`,
-        basis: `Assumes a ${ASSUMED_BODY_KG} kg adult at ${ACTIVE_PROFILE[mode.modeKey].kmh} km/h. Your own figure will differ.`
-      })
-    }
-    if (mode.modeKey === 'walking') {
-      out.push({
-        key: 'steps',
-        headline: `${int(round(km * STEPS_PER_KM, 100))} steps`,
-        detail: 'Towards a daily step target, without setting foot in a gym.',
-        basis: `Assumes ${STEPS_PER_KM} steps per km at an average stride.`
-      })
-    }
-  }
+  // --- what the car would have cost, in money and in litres ----------------
+  // Both describe fuel a car would have burned. They stay separate metrics
+  // because each drives its own pictogram — coins and drops count different
+  // things — and a tile here is a view the reader switches between, not a
+  // summary they read all at once.
+  const isCar = mode.category === 'car'
 
-  // --- Anything that beats the car ----------------------------------------
-  if (saved > 0.01) {
-    if (price && mode.category !== 'car') {
-      const cost = fuelCostFor(km, price)
+  if (!isCar && saved > 0.01) {
+    const litres = litresFor(totalKm)
+
+    if (price) {
+      const cost = fuelCostFor(totalKm, price)
       if (cost > 0) {
         out.push({
           key: 'money',
-          headline: formatMoney(cost, price.currency_code),
-          detail: 'Fuel a car would have used, that you did not buy.',
+          value: cost,
+          formatted: formatMoney(cost, price.currency_code),
+          label: 'Fuel money kept in your pocket',
+          title: `Fuel money saved${suffix}`,
+          tone: 'series-1',
+          unitLadder: UNIT_LADDERS.money,
+          unitLabel: (unit) =>
+            `1 coin = ${formatMoney(unit, price.currency_code)}`,
           basis:
-            `Fuel only, at ${formatMoney(Number(price.price_per_litre), price.currency_code)} per litre` +
+            `${CAR_LITRES_PER_100KM} L/100 km at ` +
+            `${formatMoney(Number(price.price_per_litre), price.currency_code)} per litre` +
             `${price.updated_on ? ` as at ${price.updated_on}` : ''}. ` +
-            'Excludes any fare or ticket you paid instead, and excludes tax, parking, insurance and wear.'
+            'Fuel only: excludes any fare or ticket you paid instead, and excludes ' +
+            'tax, parking, insurance and wear.'
         })
       }
     }
 
-    const days = round(treeDaysFor(saved), 1)
-    out.push({
-      key: 'trees',
-      headline: days >= 1 ? `${int(days)} tree-day${days === 1 ? '' : 's'}` : 'Under a tree-day',
-      detail: `How long a mature tree needs to absorb the ${formatKgShort(saved)} you avoided.`,
-      basis: `A mature tree absorbs about ${TREE_KG_PER_YEAR} kg CO₂ a year. A comparison, not an offset.`
-    })
+    if (litres >= 0.05) {
+      out.push({
+        key: 'fuel',
+        value: litres,
+        formatted: formatLitres(litres),
+        label: 'Petrol left in the ground',
+        title: `Petrol you did not burn${suffix}`,
+        tone: 'neutral',
+        unitLadder: UNIT_LADDERS.fuel,
+        unitLabel: (unit) => `1 drop = ${unit} L`,
+        basis: `Assumes ${CAR_LITRES_PER_100KM} L/100 km and ${PETROL_KG_PER_LITRE} kg CO₂ per litre.`
+      })
+    }
 
-    if (mode.category !== 'car') {
-      const litres = litresFor(km)
-      if (litres >= 0.2) {
-        out.push({
-          key: 'fuel',
-          headline: `${litres.toFixed(1)} litres`,
-          detail: 'Petrol a car would have burned on this trip, left in the ground.',
-          basis: `Assumes ${CAR_LITRES_PER_100KM} L/100 km and ${PETROL_KG_PER_LITRE} kg CO₂ per litre.`
-        })
-      }
+    const days = treeDaysFor(saved)
+    out.push({
+      key: 'tree',
+      value: days,
+      formatted: formatTreeTime(days),
+      label: 'Of a mature tree soaking up CO₂',
+      title: 'Tree time it would take to absorb the same CO₂',
+      tone: 'accent',
+      unitLadder: UNIT_LADDERS.tree,
+      unitLabel: (unit) =>
+        unit >= 365
+          ? `1 tree = ${plural(unit / 365, 'tree-year')}`
+          : `1 tree = ${plural(unit, 'tree-day')}`,
+      basis:
+        `A mature tree absorbs about ${TREE_KG_PER_YEAR} kg CO₂ a year. ` +
+        'A comparison, not an offset — nothing here is traded or claimed as a credit.'
+    })
+  }
+
+  // --- active travel: the health case is stronger than the carbon one ------
+  if (mode.category === 'active') {
+    const profile = ACTIVE_PROFILE[mode.modeKey]
+    const kcal = caloriesFor(mode.modeKey, totalKm)
+
+    if (kcal >= 10) {
+      out.push({
+        key: 'kcal',
+        value: kcal,
+        formatted: `${int(kcal)} kcal`,
+        label: `Burned ${profile.label} instead of sitting in traffic`,
+        title: `Energy you would burn${suffix}`,
+        tone: 'warm',
+        unitLadder: UNIT_LADDERS.kcal,
+        unitLabel: (unit) => `1 flame = ${int(unit)} kcal`,
+        basis:
+          `About ${caloriesPerKm(mode.modeKey).toFixed(0)} kcal per km for a ` +
+          `${ASSUMED_BODY_KG} kg adult at ${profile.kmh} km/h. Your own figure will differ ` +
+          'with body mass, pace, terrain and wind.'
+      })
+    }
+
+    if (mode.modeKey === 'walking') {
+      const steps = totalKm * STEPS_PER_KM
+      out.push({
+        key: 'steps',
+        value: steps,
+        formatted: `${int(steps)} steps`,
+        label: 'Steps towards your daily goal',
+        title: `Steps you would take${suffix}`,
+        tone: 'accent',
+        unitLadder: UNIT_LADDERS.steps,
+        unitLabel: (unit) => `1 footprint = ${int(unit)} steps`,
+        basis:
+          `About ${STEPS_PER_KM} steps per km at an average adult stride. ` +
+          `${int(DAILY_STEP_GOAL)} steps is a common daily target.`
+      })
     }
   }
 
-  // --- The car's own trip: state the cost rather than celebrate it ---------
-  if (mode.category === 'car' && mode.kg > 0) {
-    const litres = litresFor(km)
-    out.push({
-      key: 'fuel-burned',
-      headline: `${litres.toFixed(1)} litres`,
-      detail: 'Petrol burned on this trip.',
-      basis: `Assumes ${CAR_LITRES_PER_100KM} L/100 km. An electric car burns none, but its electricity is not free of carbon.`
-    })
+  // --- the car's own trip: state the cost rather than celebrate it ---------
+  if (isCar && mode.kg > 0) {
+    const litres = litresFor(totalKm)
+
     if (price) {
-      const cost = fuelCostFor(km, price)
+      const cost = fuelCostFor(totalKm, price)
       if (cost > 0) {
         out.push({
-          key: 'money-spent',
-          headline: formatMoney(cost, price.currency_code),
-          detail: 'Fuel for this trip, at local pump prices.',
+          key: 'money',
+          value: cost,
+          formatted: formatMoney(cost, price.currency_code),
+          label: 'Fuel for this journey, at local pump prices',
+          title: `Fuel you would pay for${suffix}`,
+          tone: 'series-1',
+          unitLadder: UNIT_LADDERS.money,
+          unitLabel: (unit) => `1 coin = ${formatMoney(unit, price.currency_code)}`,
           basis:
             `At ${formatMoney(Number(price.price_per_litre), price.currency_code)} per litre` +
             `${price.updated_on ? ` as at ${price.updated_on}` : ''}. ` +
@@ -221,35 +326,56 @@ export function benefitsFor(mode, km, price = null) {
     }
 
     out.push({
-      key: 'charges',
-      headline: `${int(mode.kg / PHONE_CHARGE_KG)} phone charges`,
-      detail: 'The same emissions, in a unit you use every day.',
-      basis: `About ${PHONE_CHARGE_KG * 1000} g CO₂e per smartphone charge.`
+      key: 'fuel',
+      value: litres,
+      formatted: formatLitres(litres),
+      label: 'Petrol burned on this journey',
+      title: `Petrol burned${suffix}`,
+      tone: 'neutral',
+      unitLadder: UNIT_LADDERS.fuel,
+      unitLabel: (unit) => `1 drop = ${unit} L`,
+      basis:
+        `Assumes ${CAR_LITRES_PER_100KM} L/100 km. An electric car burns none, ` +
+        'but its electricity is not free of carbon.'
     })
   }
 
-  // Qualitative, so it goes last: it only earns a slot when the measured cards
-  // have not already filled the row.
-  if (mode.category === 'active') {
-    out.push({
-      key: 'zero',
-      headline: 'No tailpipe',
-      detail: 'No fuel burned, nothing emitted, no parking to find.',
-      basis: 'Zero on an operational basis. Making a bicycle and growing food are not counted.'
-    })
-  }
-
-  return out.slice(0, 4)
+  return out
 }
 
-function formatKgShort(kg) {
-  if (kg < 1) return `${Math.round(kg * 1000)} g`
-  return `${kg.toFixed(kg < 10 ? 1 : 0)} kg`
+/**
+ * Choose the denomination for one pictogram glyph, and how many to draw.
+ *
+ * @param {BenefitMetric} metric
+ * @param {number} [maxGlyphs=40]
+ * @returns {{unit:number, unitLabel:string, full:number, fraction:number, count:number}}
+ */
+export function pictogramUnits(metric, maxGlyphs = 40) {
+  const ladder = metric?.unitLadder ?? [1]
+  const value = Number(metric?.value) || 0
+
+  let unit = ladder[ladder.length - 1]
+  for (const step of ladder) {
+    if (value / step <= maxGlyphs) {
+      unit = step
+      break
+    }
+  }
+
+  const exact = value / unit
+  const full = Math.floor(exact)
+  const fraction = exact - full
+  // A part-glyph is only worth drawing once it is visible; below that it reads
+  // as a rendering fault rather than as "and a bit more".
+  const count = full + (fraction > 0.05 ? 1 : 0)
+
+  return { unit, unitLabel: metric.unitLabel(unit), full, fraction, count }
 }
 
 export const BENEFIT_CONSTANTS = {
   ASSUMED_BODY_KG,
   STEPS_PER_KM,
+  DAILY_STEP_GOAL,
   TREE_KG_PER_YEAR,
   PETROL_KG_PER_LITRE,
   CAR_LITRES_PER_100KM,

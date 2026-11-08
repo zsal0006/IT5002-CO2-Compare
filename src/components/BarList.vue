@@ -16,8 +16,16 @@ const props = defineProps({
    * Pass them in the order you want them drawn.
    */
   items: { type: Array, required: true },
-  labelWidth: { type: String, default: 'minmax(7.5rem, 11rem)' }
+  labelWidth: { type: String, default: 'minmax(7.5rem, 11rem)' },
+  /**
+   * Make each row a button that emits `select`. Off by default: most bar lists
+   * here are read-only, and a row that looks pressable but does nothing is
+   * worse than a plain one.
+   */
+  selectable: { type: Boolean, default: false }
 })
+
+const emit = defineEmits(['select'])
 
 const max = computed(() => Math.max(...props.items.map((i) => Number(i.value) || 0), 0.0001))
 
@@ -30,26 +38,61 @@ function widthPct(value) {
 <template>
   <ul class="bars" :style="{ '--label-width': labelWidth }">
     <li v-for="item in items" :key="item.key" :class="{ highlight: item.highlight }">
-      <span class="label">
-        {{ item.label }}
-        <span
-          v-for="chip in item.chips ?? []"
-          :key="chip.text"
-          class="chip"
-          :class="{ good: chip.tone === 'good' }"
-        >{{ chip.text }}</span>
-      </span>
-      <span class="track">
-        <span class="bar" :style="{ width: widthPct(item.value) + '%' }" aria-hidden="true" />
-        <span class="value">{{ item.valueLabel }}</span>
-      </span>
+      <component
+        :is="selectable ? 'button' : 'div'"
+        class="row"
+        :type="selectable ? 'button' : undefined"
+        :aria-pressed="selectable ? String(!!item.highlight) : undefined"
+        @click="selectable && emit('select', item.key)"
+      >
+        <span class="label">
+          {{ item.label }}
+          <span
+            v-for="chip in item.chips ?? []"
+            :key="chip.text"
+            class="chip"
+            :class="{ good: chip.tone === 'good' }"
+          >{{ chip.text }}</span>
+        </span>
+        <span class="track">
+          <span class="bar" :style="{ width: widthPct(item.value) + '%' }" aria-hidden="true" />
+          <span class="value">{{ item.valueLabel }}</span>
+        </span>
+      </component>
     </li>
   </ul>
 </template>
 
 <style scoped>
 .bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
-.bars li { display: grid; grid-template-columns: var(--label-width) 1fr; gap: 0.75rem; align-items: center; }
+
+/* The grid lives on .row so that row can be a <button> when selectable. */
+.row {
+  display: grid;
+  grid-template-columns: var(--label-width) 1fr;
+  gap: 0.75rem;
+  align-items: center;
+  width: 100%;
+  /* Button reset — it must read as a bar, not as a control, until hovered. */
+  background: none;
+  border: 0;
+  padding: 0.15rem 0.25rem;
+  margin: -0.15rem -0.25rem;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  border-radius: var(--radius-sm);
+}
+
+button.row { cursor: pointer; }
+/* Derived from the ink rather than a new surface token: the palette is
+   validated as a set and adding a colour to it would need re-validating. */
+button.row:hover { background: rgba(11, 11, 11, 0.04); }
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) button.row:hover { background: rgba(255, 255, 255, 0.06); }
+}
+:root[data-theme='dark'] button.row:hover { background: rgba(255, 255, 255, 0.06); }
+button.row:focus-visible { outline: 2px solid var(--series-1); outline-offset: 1px; }
 
 .label { font-size: 0.9rem; color: var(--text-primary); display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
 
@@ -74,6 +117,6 @@ function widthPct(value) {
 .value { font-size: 0.85rem; font-variant-numeric: tabular-nums; color: var(--text-secondary); white-space: nowrap; }
 
 @media (max-width: 520px) {
-  .bars li { grid-template-columns: 1fr; gap: 0.2rem; }
+  .row { grid-template-columns: 1fr; gap: 0.2rem; }
 }
 </style>

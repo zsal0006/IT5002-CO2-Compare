@@ -1,16 +1,14 @@
 <script setup>
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import LocationInput from '@/components/LocationInput.vue'
-import ComparisonChart from '@/components/ComparisonChart.vue'
-import ComparisonTable from '@/components/ComparisonTable.vue'
-import ModeSelector from '@/components/ModeSelector.vue'
-import BenefitCards from '@/components/BenefitCards.vue'
-import StatTile from '@/components/StatTile.vue'
+import JourneyHero from '@/components/JourneyHero.vue'
+import WeekPlanner from '@/components/WeekPlanner.vue'
+import TripLogger from '@/components/TripLogger.vue'
 import { useTripStore } from '@/stores/trip'
 import { useFactorsStore } from '@/stores/factors'
 import { useStatsStore } from '@/stores/stats'
-import { formatCo2, formatKm } from '@/lib/format'
+import { formatCo2 } from '@/lib/format'
 import { DETOUR_FACTOR } from '@/lib/routing'
 
 /** E1, E2, E3 — define a trip, compare the modes, log the one you took. */
@@ -19,36 +17,58 @@ const factorsStore = useFactorsStore()
 const stats = useStatsStore()
 
 const { origin, destination, returnTrip, carMode } = storeToRefs(trip)
+
+/**
+ * One selection, two jobs: the mode the hero explores, and the mode the logger
+ * will record. Keeping them as one value is what makes the hero's pills and the
+ * logger's icons stay in step — picking in either place moves both.
+ */
 const chosenMode = ref(null)
+
+/**
+ * The page is one thing at a time: the form, or the results.
+ *
+ * An empty results column beside a form is the blank half-page the single
+ * centred layout was meant to kill, and a placeholder card describing what
+ * *would* appear is the same blankness with words in it. So the form stands
+ * alone until there is something to show, then steps aside — the journey is
+ * still named in the hero, and Back brings the form straight back with both
+ * addresses still in it.
+ */
+const editing = ref(true)
 
 onMounted(() => factorsStore.load())
 
 const carOptions = computed(() => factorsStore.factors.filter((f) => f.category === 'car'))
 
-/**
- * Which mode the co-benefits describe: the one the user has picked, or — before
- * they pick — the swap we are suggesting. Showing nothing until they choose
- * would hide the argument at exactly the moment it is meant to persuade.
- */
-/** Pump price for the country the trip starts in (E4-adjacent, not stored). */
+/** Pump price for the country the trip starts in (never stored with the trip). */
 const fuelPrice = computed(() => factorsStore.fuelPriceFor(origin.value?.countryCode ?? 'ZZ'))
 
-const benefitMode = computed(() => {
-  if (chosenMode.value) {
-    return trip.allModes.find((m) => m.modeKey === chosenMode.value) ?? null
-  }
-  return trip.headlineSwap?.to ?? trip.best ?? null
-})
+const baseline = computed(
+  () => trip.allModes.find((m) => m.isBaseline) ?? trip.allModes.at(-1) ?? null
+)
 
-const journeyTitle = computed(() => {
-  if (!origin.value || !destination.value) return ''
-  const name = (place) => place.label.split(',')[0].trim()
-  return `${name(origin.value)} to ${name(destination.value)}`
-})
+/**
+ * Open on the swap worth suggesting rather than on nothing. `headlineSwap`
+ * deliberately skips walking and cycling, so a 30 km commute opens on the train
+ * instead of proposing a two-hour walk.
+ */
+watch(
+  () => trip.allModes,
+  (modes) => {
+    if (!modes.length) return
+    if (chosenMode.value && modes.some((m) => m.modeKey === chosenMode.value)) return
+    chosenMode.value = trip.headlineSwap?.to?.modeKey ?? trip.best?.modeKey ?? null
+  },
+  { immediate: true }
+)
 
 async function onCalculate() {
   chosenMode.value = null
   await trip.calculate()
+  // Only leave the form once there is something to leave it for. A routing
+  // failure keeps you here, next to the fields you would need to correct.
+  if (trip.comparison.length) editing.value = false
 }
 
 async function onLog() {
@@ -56,33 +76,64 @@ async function onLog() {
   const result = await trip.logTrip(chosenMode.value)
   if (result) await stats.load({ force: true })
 }
+
+function swapEnds() {
+  const from = origin.value
+  origin.value = destination.value
+  destination.value = from
+}
 </script>
 
 <template>
-  <section class="container page">
-    <header class="intro">
-      <h1>Compare your commute</h1>
-      <p>See the environmental impact of your daily travel.</p>
-    </header>
+  <div class="container page">
+    <div class="layout" :class="{ centred: editing }">
+      <!-- ------------------------------------------------------------ E1 -- -->
+      <form v-if="editing" class="card trip" @submit.prevent="onCalculate">
+        <div>
+          <h1>Compare your commute</h1>
+          <p class="lead">See the CO₂ cost of every way to make the trip.</p>
+        </div>
 
-    <div class="layout">
-      <!-- ----------------------------------------------------------- E1 ---- -->
-      <form class="card inputs" @submit.prevent="onCalculate">
-        <LocationInput
-          v-model="origin"
-          label="Start location"
-          placeholder="Enter start address"
-          allow-current-location
-        />
-        <LocationInput
-          v-model="destination"
-          label="End location"
-          placeholder="Enter end address"
-          :bias="origin"
-        />
+        <div class="route">
+          <!-- The rail: a dot, a dashed run and a square, tying the two fields
+               into one journey rather than two unrelated inputs. -->
+          <div class="rail" aria-hidden="true">
+            <span class="dot" />
+            <span class="line" />
+            <span class="square" />
+          </div>
+
+          <div class="fields">
+            <LocationInput
+              v-model="origin"
+              label="From"
+              placeholder="Enter start address"
+              allow-current-location
+            />
+            <LocationInput
+              v-model="destination"
+              label="To"
+              placeholder="Enter destination"
+              :bias="origin"
+            />
+          </div>
+
+          <button
+            type="button"
+            class="swap"
+            aria-label="Swap start and end"
+            :disabled="!origin && !destination"
+            @click="swapEnds"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" />
+            </svg>
+          </button>
+        </div>
 
         <div v-if="carOptions.length" class="field">
-          <label for="car-type">Vehicle type</label>
+          <label for="car-type">Compare against</label>
           <select id="car-type" v-model="carMode">
             <option v-for="c in carOptions" :key="c.mode_key" :value="c.mode_key">
               {{ c.mode_label }}
@@ -90,137 +141,196 @@ async function onLog() {
           </select>
         </div>
 
-        <label class="check">
-          <input v-model="returnTrip" type="checkbox" />
-          <span>Return trip (doubles the distance)</span>
-        </label>
+        <div class="toggle-row">
+          <span>
+            <span class="toggle-title">Return trip</span>
+            <span class="toggle-sub">Doubles the distance</span>
+          </span>
+          <button
+            type="button"
+            role="switch"
+            class="switch"
+            :class="{ on: returnTrip }"
+            :aria-checked="String(returnTrip)"
+            aria-label="Return trip"
+            @click="returnTrip = !returnTrip"
+          >
+            <span class="knob" />
+          </button>
+        </div>
 
         <button type="submit" :disabled="!trip.ready || trip.calculating">
           {{ trip.calculating ? 'Calculating…' : 'Compare routes' }}
         </button>
 
-        <p class="privacy muted">Addresses are not stored.</p>
+        <p class="privacy">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="5" y="11" width="14" height="10" rx="2" />
+            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+          </svg>
+          Addresses are never stored.
+        </p>
 
         <p v-if="factorsStore.usingFallback" class="notice">{{ factorsStore.error }}</p>
       </form>
 
-      <!-- ----------------------------------------------------------- E2 ---- -->
-      <div class="results">
+      <!-- ------------------------------------------------------- E2, E3 --- -->
+      <div v-else class="results">
         <p v-if="trip.error" class="notice error">{{ trip.error }}</p>
 
-        <div v-if="trip.comparison.length" class="card">
-          <header class="journey">
-            <h2>{{ journeyTitle }}</h2>
-            <p class="distance">{{ formatKm(trip.effectiveKm) }}</p>
-          </header>
+        <template v-if="trip.comparison.length">
+          <button type="button" class="secondary back" @click="editing = true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M19 12H5M11 18l-6-6 6-6" />
+            </svg>
+            Change trip
+          </button>
 
           <p v-if="trip.approximate" class="notice">
             We could not reach the routing service, so this is a straight-line distance
             with a {{ DETOUR_FACTOR }}× allowance for real roads. Treat it as approximate.
           </p>
 
-          <ComparisonChart
-            :results="trip.comparison"
-            :selected-key="chosenMode"
+          <JourneyHero
+            v-model="chosenMode"
+            :modes="trip.allModes"
+            :baseline="baseline"
             :distance-km="trip.effectiveKm"
+            :return-trip="returnTrip"
+            :fuel-price="fuelPrice"
+            :origin-label="origin?.label ?? ''"
+            :destination-label="destination?.label ?? ''"
           />
 
-          <!-- E2.2: the headline swap, stated as a sentence rather than left
-               for the reader to subtract two bars. -->
-          <p v-if="trip.headlineSwap" class="notice good swap">
-            Switching from {{ trip.headlineSwap.from.label.toLowerCase() }} to
-            {{ trip.headlineSwap.to.label.toLowerCase() }} saves
-            <strong>{{ formatCo2(trip.headlineSwap.savedKg) }}</strong> CO₂e.
-          </p>
-
-          <BenefitCards
-            :mode="benefitMode"
-            :distance-km="trip.effectiveKm"
+          <WeekPlanner
+            :modes="trip.allModes"
+            :baseline="baseline"
+            :distance-km="trip.distanceKm"
             :fuel-price="fuelPrice"
           />
 
-          <ComparisonTable :results="trip.comparison" />
+          <TripLogger
+            v-model="chosenMode"
+            :modes="trip.allModes"
+            :logging="trip.logging"
+            :last-log="trip.lastLog"
+            @log="onLog"
+          />
 
-          <div class="headline">
-            <StatTile
-              label="Distance"
-              :value="formatKm(trip.effectiveKm)"
-              :context="returnTrip ? 'Return trip' : 'One way'"
-            />
-            <StatTile
-              label="Worst option"
-              :value="formatCo2(trip.worst?.kg ?? 0)"
-              :context="trip.worst?.label"
-            />
-            <StatTile
-              tone="good"
-              label="Best option"
-              :value="formatCo2(trip.best?.kg ?? 0)"
-              :context="trip.best?.label"
-            />
-          </div>
-        </div>
-
-        <!-- ----------------------------------------------------------- E3 -- -->
-        <div v-if="trip.allModes.length" class="card log">
-          <ModeSelector v-model="chosenMode" :modes="trip.allModes" :disabled="trip.logging" />
-
-          <button :disabled="!chosenMode || trip.logging" @click="onLog">
-            {{ trip.logging ? 'Logging…' : 'Log this trip' }}
-          </button>
-
-          <p v-if="trip.lastLog" class="notice good">
-            Logged. You avoided <strong>{{ formatCo2(trip.lastLog.savedKg) }}</strong> of
-            CO₂e compared with driving. See it counted on the
-            <RouterLink to="/impact">Impact</RouterLink> page.
+          <p v-if="trip.sessionSavedKg > 0" class="muted session">
+            This session you have logged {{ formatCo2(trip.sessionSavedKg) }} avoided. That
+            figure lives in this tab only and is gone when you close it.
           </p>
+        </template>
 
-          <p v-if="trip.sessionSavedKg > 0" class="muted">
-            This session you have logged {{ formatCo2(trip.sessionSavedKg) }} avoided.
-            That figure lives in this tab only and is gone when you close it.
-          </p>
-        </div>
-
-        <p v-if="trip.comparison.length" class="how">
-          <RouterLink to="/learn">How we calculate this</RouterLink>
-        </p>
       </div>
     </div>
-  </section>
+  </div>
 </template>
 
 <style scoped>
+.page { padding: 2rem 0 3.5rem; }
+
 /*
- * A single centred column, as the wireframes show. An earlier two-column grid
- * reserved a results column that is empty until you search, which left half the
- * page blank on the screen people see first.
+ * One pane at a time. While editing, the form is alone and centred at reading
+ * width; once there are results it has the full column to itself. Nothing here
+ * ever reserves space for a pane that is not on screen.
  */
-.page { width: min(40rem, 100%); margin-inline: auto; }
+.layout { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-start; }
+.layout.centred { justify-content: center; }
 
-.intro { margin: 1.5rem 0 2rem; text-align: center; }
-.intro p { font-size: 1.05rem; margin: 0; }
+.trip { flex: 1 1 320px; max-width: 100%; display: flex; flex-direction: column; gap: 1.25rem; }
+.centred .trip { flex: 0 1 30rem; }
 
-.layout { display: grid; gap: 1.25rem; }
+.results { flex: 1 1 100%; min-width: 0; display: flex; flex-direction: column; gap: 1.25rem; }
 
-.inputs button[type='submit'] { width: 100%; margin-top: 0.5rem; }
-.privacy { text-align: center; margin: 0.6rem 0 0; }
+/* Sits above the hero, aligned to the column's leading edge. */
+.back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  padding: 0 0.875rem;
+  font-size: 0.875rem;
+}
 
-.check { display: flex; gap: 0.5rem; align-items: center; font-size: 0.9rem; margin: 0.25rem 0 0.75rem; }
-.check input { width: auto; }
+.trip h1 { margin: 0; font-size: 1.625rem; }
+.lead { margin: 0.375rem 0 0; font-size: 0.875rem; color: var(--text-secondary); }
 
-.results { display: grid; gap: 1.25rem; }
+/* --- the route rail ---------------------------------------------------- */
+.route { display: flex; gap: 0.75rem; align-items: stretch; }
 
-.journey { text-align: center; margin-bottom: 1.25rem; }
-.journey h2 { margin-bottom: 0.1rem; }
-.distance { font-size: 1.1rem; color: var(--series-1); font-weight: 600; margin: 0; }
+.rail { display: flex; flex-direction: column; align-items: center; padding: 2.1rem 0 1.1rem; }
+.dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--text-primary); }
+.line {
+  flex: 1;
+  width: 2px;
+  margin: 4px 0;
+  background: repeating-linear-gradient(var(--axis) 0 4px, transparent 4px 8px);
+}
+.square { width: 10px; height: 10px; border-radius: 2px; background: var(--accent); }
 
-.swap { margin-top: 1rem; }
+.fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.625rem; }
 
-.headline { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.75rem; margin-top: 1.25rem; }
-.headline :deep(.tile) { box-shadow: none; }
+.swap {
+  align-self: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.swap:hover:not(:disabled) { border-color: var(--axis); }
 
-.log button { margin-top: 1rem; }
-.log .notice { margin-top: 1rem; }
+/* --- the return switch -------------------------------------------------- */
+.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.toggle-title { display: block; font-size: 0.875rem; font-weight: 600; }
+.toggle-sub { display: block; font-size: 0.8125rem; color: var(--text-secondary); }
 
-.how { text-align: center; margin: 0 0 2rem; font-size: 0.9rem; }
+.switch {
+  width: 52px;
+  height: 30px;
+  min-height: 30px;
+  flex: none;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  border: 0;
+  background: var(--axis);
+  position: relative;
+  transition: background 0.2s;
+}
+.switch.on { background: var(--accent); }
+.knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: left 0.2s;
+}
+.switch.on .knob { left: 25px; }
+
+.privacy {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+/* --- results ------------------------------------------------------------ */
+
+.session { margin: 0; }
 </style>
