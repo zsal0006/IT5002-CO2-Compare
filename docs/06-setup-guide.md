@@ -37,7 +37,6 @@ that is the designed fallback, not a failure.
 ```
 VITE_SUPABASE_URL=https://abcdefgh.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGci...
-VITE_APP_CONTACT=your-team-email@example.ac.uk
 ```
 
 4. **SQL Editor → New query**: paste and run, in this order:
@@ -208,7 +207,6 @@ almost nothing configured by hand.
    |------|-------|--------------|
    | `VITE_SUPABASE_URL` | your project URL | Production, Preview, Development |
    | `VITE_SUPABASE_ANON_KEY` | your `anon` `public` key | Production, Preview, Development |
-   | `VITE_APP_CONTACT` | your team email | Production, Preview, Development |
 
 5. Deploy. Subsequent pushes to `main` deploy to production automatically; every pull
    request gets its own preview URL, which is what the sprint reviews should demo.

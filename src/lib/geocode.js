@@ -6,13 +6,19 @@
  * requests out, and results are cached for the lifetime of the tab so retyping
  * the same place costs nothing.
  *
+ * We do not send a contact address. The policy's "identify your application"
+ * rule is aimed at server-side callers that set a User-Agent; browsers forbid
+ * JavaScript from setting that header, and Nominatim identifies browser traffic
+ * by Referer, which the browser sends on its own. Putting a contact address in a
+ * VITE_ variable would compile a real email into a public bundle and send it
+ * nowhere.
+ *
  * https://operations.osmfoundation.org/policies/nominatim/
  */
 
 const ENDPOINT = 'https://nominatim.openstreetmap.org/search'
 const REVERSE_ENDPOINT = 'https://nominatim.openstreetmap.org/reverse'
 const MIN_INTERVAL_MS = 1100
-const CONTACT = import.meta.env.VITE_APP_CONTACT || 'co2-compare-it5002'
 
 const cache = new Map()
 let lastCallAt = 0
@@ -228,4 +234,3 @@ export function _clearCache() {
 
 // Nominatim and OSRM both require this attribution wherever their data is shown.
 export const OSM_ATTRIBUTION = '© OpenStreetMap contributors'
-export const CONTACT_STRING = CONTACT

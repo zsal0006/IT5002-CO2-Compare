@@ -44,7 +44,7 @@ function.
 
 Hosted on **Vercel**. Pushes to `main` deploy to production; every pull request gets a
 preview URL. Build settings, the SPA rewrite and asset cache headers live in
-`vercel.json` — the only manual step is adding the three `VITE_` environment variables
+`vercel.json` — the only manual step is adding the two `VITE_` environment variables
 in the Vercel dashboard. Full walkthrough in [docs/06 §6.6](docs/06-setup-guide.md).
 
 > `VITE_` variables are compiled into the client bundle. Only the Supabase **anon**
