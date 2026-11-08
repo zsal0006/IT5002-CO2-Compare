@@ -17,3 +17,9 @@ data/raw/
 # co-editing works - git cannot diff them and would store a fresh copy per edit.
 *.pptx
 *.docx
+
+# Source spreadsheets. The GIZ download is 1.4 MB of binary that git cannot
+# diff, and it is re-downloadable from CKAN. The CSV the loader produces IS
+# committed, so nobody else needs Excel or the original file.
+*.xlsx
+*.xls

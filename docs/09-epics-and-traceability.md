@@ -18,7 +18,7 @@ Where this document and `01-requirements.md` disagree, **the user stories win**;
 | E2 | Emissions comparison | `lib/emissions.js`, `ComparisonChart`, `ComparisonTable`, `LearnView` |
 | E3 | Savings tracking | `TripLogger`, `log_trip()` |
 | E4 | Community impact | `ImpactView`, `v_savings_by_region`, `v_savings_by_mode` |
-| E5 | Emissions dashboard | `DashboardView`, `EmissionsTimeSeries`, `WorldEmissionsMap` |
+| E5 | Emissions dashboard | `DashboardView`, `EmissionsTrend`, `DecadeBars`, `WorldEmissionsMap` |
 | E6 | Data, privacy and platform | Schema + RLS, `theme.css`, responsive layouts |
 
 ## 9.2 Story traceability
@@ -38,7 +38,7 @@ Task is the sprint task in `05-implementation-plan.md`.
 | 4.1 Region and global totals | M | FR-14, FR-15, FR-23 | T-3.3, T-3.4, T-4.8 | `ImpactView.vue`, `v_savings_by_region` | Scaffolded |
 | 4.2 Savings by transport mode | S | FR-24 | T-4.5 | `v_savings_by_mode`, `BarList.vue` | Scaffolded |
 | 5.1 Country transport emissions and share | M | FR-16, FR-18 | T-4.1, T-4.3 | `DashboardView` tiles, `country_series()` | Scaffolded |
-| 5.2 Trend over time | S | FR-17 | T-4.2 | `EmissionsTimeSeries.vue` | Scaffolded |
+| 5.2 Trend over time | S | FR-17 | T-4.2 | `EmissionsTrend.vue` | Scaffolded |
 | **5.3 Emissions by region map** | **M** | FR-25 | T-4.9 | `WorldEmissionsMap.vue` | Scaffolded |
 | 6.1 Factors stored in the database | M | FR-26 | T-1.3, T-1.6 | `emission_factors` table, `factors` store | Scaffolded |
 | 6.2 Addresses not saved | M | FR-12 | T-1.5, T-3.3 | `trip_logs` schema, `log_trip()` | Scaffolded |

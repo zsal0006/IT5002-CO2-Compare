@@ -97,7 +97,7 @@ Legend: **M** = must-have, **S** = should-have, **X** = stretch.
 | # | Task | Pri |
 |---|------|-----|
 | T-4.1 | `CountrySelect.vue` — searchable select over the distinct country list. | M |
-| T-4.2 | `EmissionsTimeSeries.vue` — line chart, 1970–2024, Mt CO₂e. | M |
+| T-4.2 | `EmissionsTrend.vue` — scrubbable area chart, 1970–2024, Mt CO₂e. | M |
 | T-4.3 | Transport-share-of-total stat tile for the selected year. | S |
 | T-4.4 | Savings-by-country section: global tile, selected-country tile, ranked table. | M |
 | T-4.5 | Savings-by-mode chart from `v_savings_by_mode`, ranked by kg avoided. *(story 4.2)* | S |

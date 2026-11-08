@@ -50,6 +50,34 @@ const MEASURES = {
 
 const COUNTRY_CODE_HEADER = /(edgar.*country.*code|^iso_?3$|^country_?code$|^iso3c$)/
 
+/**
+ * EDGAR codes that pass the three-letter test but are NOT countries.
+ *
+ * International shipping and aviation are booked against no nation — that is
+ * the point of them. Both are large: on 2024 figures SEA would rank third in
+ * the world and AIR fourth, on a page headed "transport emissions by country".
+ * They are excluded rather than shown, because a reader scanning a country
+ * ranking has no way to know those two rows mean something else.
+ *
+ * Dropping them also keeps the choropleth honest: neither has a boundary, so
+ * they would silently vanish from the map while still sitting near the top of
+ * the table beside it.
+ */
+const NOT_COUNTRIES = new Map([
+  ['SEA', 'International shipping'],
+  ['AIR', 'International aviation']
+])
+
+/**
+ * States that no longer exist. Their data is real and historical, so it is
+ * kept — but `Intl.DisplayNames` has no name for a dissolved country, and a
+ * bare "SCG" in a dropdown is not a label.
+ */
+const HISTORICAL_NAMES = new Map([
+  ['SCG', 'Serbia and Montenegro (to 2006)'],
+  ['ANT', 'Netherlands Antilles (to 2010)']
+])
+
 // ---------------------------------------------------------------- CSV parsing
 
 /** Minimal RFC-4180 parser: quoted fields, embedded commas, CRLF. */
@@ -93,15 +121,49 @@ function splitYearColumn(header) {
   return { measure: m[1], year }
 }
 
+/**
+ * Parse a numeric cell.
+ *
+ * THE FILE MIXES DECIMAL SEPARATORS. Roughly 57,000 cells write the decimal
+ * point as a comma (`14230,22955`) and 22,000 as a dot (`928.601913036`), which
+ * is what a European-locale export looks like when some cells were stored as
+ * text and some as real numbers.
+ *
+ * A comma here is ALWAYS a decimal point, never thousands grouping. Two things
+ * establish that, and both were checked against this file rather than assumed:
+ *
+ *   - `CHN` 2020 reads `14230,22955` — five digits ahead of the comma, where a
+ *     thousands separator would fall after three.
+ *   - No cell in the file contains both a comma and a dot, so nothing is
+ *     grouped and then pointed.
+ *
+ * Stripping commas — which this function used to do — turned `0,0492…` into
+ * the integer 4927269082996931 and made every share-of-total check fail. Any
+ * future source must be re-checked the same way before this rule is reused.
+ */
 const num = (v) => {
-  const s = String(v ?? '').replace(/[, ]/g, '').trim()
+  const s = String(v ?? '').trim()
   if (s === '' || s === '-' || /^(na|n\/a|null|nan)$/i.test(s)) return null
-  const n = Number(s)
+
+  let cleaned = s.replace(/\s/g, '')
+
+  if (cleaned.includes(',')) {
+    if (cleaned.includes('.')) {
+      // Not seen in the GIZ file. Rather than guess which separator means what,
+      // refuse the cell so the sanity check reports it instead of quietly
+      // loading a figure that is out by a factor of a thousand.
+      return null
+    }
+    cleaned = cleaned.replace(',', '.')
+  }
+
+  const n = Number(cleaned)
   return Number.isFinite(n) ? n : null
 }
 
 const regionNames = new Intl.DisplayNames(['en'], { type: 'region' })
 function nameFor(alpha3) {
+  if (HISTORICAL_NAMES.has(alpha3)) return HISTORICAL_NAMES.get(alpha3)
   const a2 = toAlpha2(alpha3)
   if (a2 === 'ZZ') return alpha3
   try { return regionNames.of(a2) ?? alpha3 } catch { return alpha3 }
@@ -202,6 +264,7 @@ const out = [['country_code', 'country_name', 'year', 'transport_mt_co2e', 'tota
 const codes = new Set()
 let skippedCode = 0
 let emptyCells = 0
+const skippedNotCountry = []
 
 // Cross-check of our reading of Global_Emissions (see MEASURES).
 let shareChecked = 0
@@ -211,6 +274,7 @@ const mismatchExamples = []
 for (const r of body) {
   const code = String(r[codeIndex] ?? '').trim().toUpperCase()
   if (!/^[A-Z]{3}$/.test(code)) { skippedCode++; continue }
+  if (NOT_COUNTRIES.has(code)) { skippedNotCountry.push(code); continue }
   codes.add(code)
   const name = nameFor(code)
 
@@ -247,6 +311,13 @@ console.log(`\nWrote ${output}`)
 console.log(`  rows:      ${out.length - 1}`)
 console.log(`  countries: ${codes.size}`)
 console.log(`  skipped:   ${skippedCode} rows without a 3-letter ISO code`)
+if (skippedNotCountry.length) {
+  console.log(
+    `  excluded:  ${skippedNotCountry.map((c) => `${c} (${NOT_COUNTRIES.get(c)})`).join(', ')}
+` +
+      `             not countries — see NOT_COUNTRIES at the top of this script`
+  )
+}
 console.log(`  blank:     ${emptyCells} country-year cells with no transport figure`)
 
 // --- report the cross-check --------------------------------------------------

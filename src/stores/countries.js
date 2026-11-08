@@ -24,19 +24,16 @@ export const useCountriesStore = defineStore('countries', () => {
     }
     loadingList.value = true
     try {
-      // One row per country: take the most recent year's row for each.
+      // v_countries (migration 0004) is already one row per country. Selecting
+      // from the base table instead would pull every country-year — about
+      // 12,200 rows — to fill a dropdown, and would be cut short by any row
+      // limit the project has set, leaving most countries missing with no error.
       const { data, error: err } = await supabase
-        .from('country_transport_emissions')
+        .from('v_countries')
         .select('country_code, country_name')
         .order('country_name')
       if (err) throw err
-
-      const seen = new Set()
-      list.value = (data ?? []).filter((r) => {
-        if (seen.has(r.country_code)) return false
-        seen.add(r.country_code)
-        return true
-      })
+      list.value = data ?? []
     } catch (err) {
       error.value = `Could not load the country list: ${err.message}`
     } finally {

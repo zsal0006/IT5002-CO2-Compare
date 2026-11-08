@@ -171,8 +171,9 @@ Returns the year/transport/total/share series for one country, ordered by year.
 
 | File | Contents |
 |------|----------|
-| `supabase/seed/0100_seed_sources_and_factors.sql` | `data_sources` + ~15 `emission_factors` rows |
-| `supabase/seed/0003_seed_country_emissions.sql` | loader for `data/country_transport_emissions.csv` |
+| `supabase/seed/0100_seed_sources_and_factors.sql` | `data_sources` + 14 `emission_factors` rows |
+| `supabase/seed/0101_staging_country_emissions.sql` | empty `staging_country_emissions` landing table |
+| `supabase/seed/0102_load_country_emissions.sql` | `country_transport_emissions` from staging |
 | `data/emission_factors.csv` | human-editable source of truth for the factors |
 
 Re-seeding is idempotent (`on conflict do update`), so the team can pull a refreshed

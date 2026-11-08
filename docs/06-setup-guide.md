@@ -67,12 +67,20 @@ rows, so neither `datastore_search` nor a direct CSV link is an option.
 
 ### 2. Convert and normalise
 
-Open the XLSX in Excel, and **save Sheet1 as CSV** into `data/raw/`
-(git-ignored). Then:
+> **Already done.** `data/country_transport_emissions.csv` is committed —
+> 12,305 rows across 224 countries, 1970–2024. Skip to step 3 unless you are
+> refreshing it from a newer download.
+
+The download is XLSX and our loader reads CSV, so convert it first. No Excel
+needed:
 
 ```bash
+python -I scripts/xlsx-to-csv.py <the-download>.xlsx data/raw/ghg-giz.csv
 node scripts/prepare-country-emissions.mjs
 ```
+
+`data/raw/` is git-ignored; the generated CSV in `data/` is committed so
+teammates need neither the spreadsheet nor a converter.
 
 **The source is wide; our table is long.** GIZ ships one row per country with
 ten columns per year repeating from 1970 to 2024 — roughly 552 columns:
@@ -106,18 +114,37 @@ file's own `Share_Transport_National`:
 
 ```
 Sanity check — is Global_Emissions really the national total?
-  OK — 10395 of 10395 agree within 2 points.
+  OK — 12214 of 12214 agree within 2 points.
+  Global_Emissions reads as the national all-sector total, as assumed.
 ```
 
-If instead it prints `*** MISMATCH ***`, stop. `Global_Emissions` is something
-other than the country's all-sector total — the world total, most likely — and
-loading it would make the dashboard's share-of-total figure silently wrong.
-Report it rather than loading anyway.
+If instead it prints `*** MISMATCH ***`, stop. Either `Global_Emissions` is
+something other than the country's all-sector total — the world total, most
+likely — or the numbers are being parsed wrongly. Loading it anyway would make
+the dashboard's share-of-total figure silently wrong.
 
-Expect roughly 190 countries across 1970–2024. Rows skipped for not having a
-three-letter ISO code are aggregates such as `EU27`.
+> **This check has already earned its keep.** The first run reported a mismatch
+> on 11,134 of 12,214 rows with "stated" shares like `4927269082996931`. The
+> cause was ours: the file writes most decimals with a **comma**
+> (`14230,22955`) and the rest with a dot, and the loader was stripping commas,
+> turning `0,0492…` into an integer. A source that mixes separators must be
+> re-checked the same way — `CHN` has five digits before its comma, and no cell
+> in the file carries both separators, which is what proves the comma is a
+> decimal point and not thousands grouping.
 
-### 3. Import into staging
+Expect 224 countries across 1970–2024 and about 12,300 rows. Rows without a
+three-letter ISO code are aggregates such as `EU27` and are skipped.
+
+### 3. Create the staging table
+
+SQL Editor → run `supabase/seed/0101_staging_country_emissions.sql`.
+
+This only creates the empty table. It is a separate file from the loader
+because a human has to upload a file between the two — and when both lived in
+one script, running it straight through created the table and read zero rows
+from it, succeeding silently.
+
+### 4. Import into staging
 
 Supabase Studio → **Table editor** → `staging_country_emissions` → **Import data
 from CSV** → upload `data/country_transport_emissions.csv`.
@@ -127,13 +154,24 @@ into staging rather than the real table means a bad file cannot corrupt
 `country_transport_emissions`, and the generated `transport_share_pct` column
 stays out of the way.
 
-### 4. Move it across
+### 5. Move it across
 
-Run `supabase/seed/0101_load_country_emissions.sql` and work through its numbered
-comment blocks: check what arrived, insert with `on conflict do update`, verify a
-few countries against the portal, then clear staging.
+Run `supabase/seed/0102_load_country_emissions.sql`. It refuses to run against
+an empty or wrongly-mapped staging table, upserts on `(country_code, year)` so
+it is safe to re-run, then prints row counts and three countries to check:
 
-### 5. Reconcile the map
+```
+AUS  Australia   92.2  579.5  15.9%
+AUT  Austria     21.9   77.0  28.5%
+BHR  Bahrain      3.3   63.2   5.3%
+```
+
+Australia and Austria must be distinct — they share the first two letters of
+their ISO3 codes, which is the mix-up `src/lib/iso.js` exists to prevent on the
+client. Clear staging with the `truncate` at the foot of the file once those
+figures look right.
+
+### 6. Reconcile the map
 
 ```sql
 select distinct country_code from country_transport_emissions order by 1;
