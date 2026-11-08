@@ -31,9 +31,24 @@ petrol / diesel / electric car split and to sanity-check A1's car figures.
 
 ### Group B — national and global context (drives the dashboard)
 
-**B1. GIZ / transport-data.org — Country-level yearly GHG emissions, transport sector, 1970–2024**
+**B1. GIZ — "Country-Level Yearly GHG Emissions + Transport Sector (1970-2024)"**
 `https://portal.transport-data.org/@giz/country-level-yearly-ghg-emissions-transport-sector-1970-2024`
-Role: the country time series, the transport-vs-total share, and the global total.
+Published by GIZ, constructed from **EDGAR** data (European Commission); an
+extended version of the data behind the EDGAR 2025 official report.
+Role: the country time series, the transport-vs-total share, and the world map.
+
+Delivered as a single XLSX in **wide** form — one row per country, ten columns per
+year from 1970 to 2024 (~552 columns), keyed on an EDGAR ISO3 country code. Figures
+are MtCO₂e. There is no CSV and the CKAN datastore is empty, so it is converted and
+unpivoted locally by `scripts/prepare-country-emissions.mjs`; see docs/06 §6.4.
+
+Beyond what we load, each year also carries population, per-capita totals, the
+transport share of global emissions, and the top three emitting sectors. None is
+used yet — an obvious source of further dashboard material.
+
+> **Licence not yet confirmed.** `license_title` is null on the CKAN package.
+> Establish the licence and the required attribution before submission (T-1.10);
+> until then the Learn page credits GIZ and EDGAR without asserting a licence.
 
 ## 4.2 Baseline emission factors
 

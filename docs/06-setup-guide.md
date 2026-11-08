@@ -57,32 +57,66 @@ to show.
 
 ### 1. Download
 
-From https://portal.transport-data.org/@giz/country-level-yearly-ghg-emissions-transport-sector-1970-2024
-Save the CSV anywhere under `data/raw/` — that folder is git-ignored, so the raw
-download never reaches the repository.
+Dataset: **"Country-Level Yearly GHG Emissions + Transport Sector (1970-2024)"**,
+published by **GIZ**, built from **EDGAR** data (European Commission).
 
-### 2. Normalise
+- Package: `https://ckan.tdc.prod.datopian.com/api/action/package_show?id=d16b0c80-35d4-428b-9453-e4e4626e7365`
+- The one resource is `GHG_01072026.xlsx`, about 1.4 MB.
+
+There is **no CSV version** and the CKAN datastore for this resource returns no
+rows, so neither `datastore_search` nor a direct CSV link is an option.
+
+### 2. Convert and normalise
+
+Open the XLSX in Excel, and **save Sheet1 as CSV** into `data/raw/`
+(git-ignored). Then:
 
 ```bash
 node scripts/prepare-country-emissions.mjs
 ```
 
-The script finds the one CSV in `data/raw/`, works out which source column feeds
-each of ours, and writes `data/country_transport_emissions.csv` with exactly the
-five columns `staging_country_emissions` expects.
+**The source is wide; our table is long.** GIZ ships one row per country with
+ten columns per year repeating from 1970 to 2024 — roughly 552 columns:
 
-**Read what it prints.** It reports the column mapping it chose and how many rows
-it skipped and why. A wrong guess is visible here, before anything reaches the
-database. If a column shows `*** NOT FOUND ***`, add the real header name to the
-`MAPPING` object at the top of the script and run it again.
-
-```bash
-node scripts/prepare-country-emissions.mjs --inspect   # headers only, writes nothing
-node scripts/prepare-country-emissions.mjs --in data/raw/other.csv
+```
+EDGAR Country Code | Global_Emissions_1970 [MtCO2e] | Transport_Emissions_1970 [MtCO2e] | …
+AUS                | 311.2                          | 55.7                              | …
 ```
 
-Expect roughly 190 countries across 1970–2024. Rows skipped for lacking a
-three-letter ISO code are usually aggregates such as `WORLD` or `EU27`.
+The script unpivots that into one row per country-year. There is no `year`
+column to find — the year is inside each column name. There is also no country
+**name** column, only an ISO3 code, so names are derived via `src/lib/iso.js`
+and `Intl.DisplayNames`.
+
+What it reads, and what it ignores:
+
+| Source measure | Our column |
+|---|---|
+| `Transport_Emissions_YYYY [MtCO2e]` | `transport_mt_co2e` |
+| `Global_Emissions_YYYY [MtCO2e]` | `total_mt_co2e` |
+| `Share_Transport_National_YYYY [fraction]` | used to verify, not loaded |
+| Share global, population, per-capita, Rank1–3 sector | ignored for now |
+
+Units are megatonnes CO₂e, which is what the schema expects.
+
+#### Read the sanity check before loading
+
+`Global_Emissions` is an ambiguous name, so the script does not take our reading
+of it on trust. It recomputes `transport ÷ total` and compares that against the
+file's own `Share_Transport_National`:
+
+```
+Sanity check — is Global_Emissions really the national total?
+  OK — 10395 of 10395 agree within 2 points.
+```
+
+If instead it prints `*** MISMATCH ***`, stop. `Global_Emissions` is something
+other than the country's all-sector total — the world total, most likely — and
+loading it would make the dashboard's share-of-total figure silently wrong.
+Report it rather than loading anyway.
+
+Expect roughly 190 countries across 1970–2024. Rows skipped for not having a
+three-letter ISO code are aggregates such as `EU27`.
 
 ### 3. Import into staging
 

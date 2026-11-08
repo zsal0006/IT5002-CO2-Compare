@@ -1,40 +1,58 @@
 /**
- * Turn the GIZ country-level transport emissions download into a CSV that
- * matches the `staging_country_emissions` table exactly (Sprint 1, T-1.1).
+ * Turn the GIZ country-level GHG download into a CSV matching
+ * `staging_country_emissions` (Sprint 1, T-1.1).
  *
  *   node scripts/prepare-country-emissions.mjs
- *   node scripts/prepare-country-emissions.mjs --inspect     # headers only
- *   node scripts/prepare-country-emissions.mjs --in path.csv --out out.csv
+ *   node scripts/prepare-country-emissions.mjs --inspect        # report only
+ *   node scripts/prepare-country-emissions.mjs --in f.csv --out o.csv
  *
- * Put the raw download anywhere under data/raw/ (git-ignored) and run it.
- * The script reports which source column it mapped to each target column, so a
- * wrong guess is visible before anything reaches the database rather than
- * after.
+ * ---------------------------------------------------------------------------
+ * THE SHAPE OF THE SOURCE
+ *
+ * GIZ ships this as a single XLSX in WIDE form: one row per country, and ten
+ * columns per year repeating from 1970 to 2024 — roughly 552 columns.
+ *
+ *   EDGAR Country Code | Global_Emissions_1970 [MtCO2e] | Transport_Emissions_1970 [MtCO2e] | …
+ *   AUS                | 311.2                          | 55.7                              | …
+ *
+ * Our table is LONG — one row per country per year — so this script unpivots.
+ * There is no year column to find; the year is inside each column name.
+ *
+ * There is also no country NAME column: the only identifier is an ISO3 code, so
+ * names are derived from `src/lib/iso.js` plus Intl.DisplayNames.
+ *
+ * The file is XLSX and its CKAN datastore is empty, so there is no CSV to
+ * download and no API to query. Open the XLSX in Excel and save Sheet1 as CSV
+ * first — see docs/06 §6.4.
+ * ---------------------------------------------------------------------------
  */
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { toAlpha2 } from '../src/lib/iso.js'
 
 const RAW_DIR = 'data/raw'
 const DEFAULT_OUT = 'data/country_transport_emissions.csv'
 
-/** Candidate source header names per target column, best guess first. */
-const MAPPING = {
-  country_code: ['iso3', 'iso_3', 'iso3c', 'country_code', 'countrycode', 'iso', 'code', 'country_iso3'],
-  country_name: ['country_name', 'country', 'name', 'countryname', 'area', 'region'],
-  year: ['year', 'yr', 'date', 'period'],
-  transport_mt_co2e: [
-    'transport_mt_co2e', 'transport', 'transport_emissions', 'transport_ghg',
-    'value', 'emissions', 'co2e', 'mt_co2e', 'ghg_transport'
-  ],
-  total_mt_co2e: [
-    'total_mt_co2e', 'total', 'total_emissions', 'total_ghg', 'national_total',
-    'economy_wide', 'all_sectors'
-  ]
+/**
+ * Which wide measure feeds which of our columns.
+ *
+ * `Global_Emissions_YYYY` is read as the country's all-sector total, which is
+ * what `total_mt_co2e` means. That reading is CHECKED, not assumed: the script
+ * recomputes transport ÷ total and compares it with the file's own
+ * `Share_Transport_National_YYYY`. If the two disagree the interpretation is
+ * wrong and the script says so loudly rather than loading bad data.
+ */
+const MEASURES = {
+  transport_mt_co2e: /^transport_emissions$/,
+  total_mt_co2e: /^global_emissions$/,
+  share_national: /^share_transport_national$/
 }
+
+const COUNTRY_CODE_HEADER = /(edgar.*country.*code|^iso_?3$|^country_?code$|^iso3c$)/
 
 // ---------------------------------------------------------------- CSV parsing
 
-/** Minimal RFC-4180 parser: handles quoted fields, embedded commas, CRLF. */
+/** Minimal RFC-4180 parser: quoted fields, embedded commas, CRLF. */
 function parseCsv(text) {
   const rows = []
   let row = []
@@ -64,137 +82,189 @@ function toCsv(rows) {
   return rows.map((r) => r.map(esc).join(',')).join('\n') + '\n'
 }
 
-// ------------------------------------------------------------------- mapping
+const slug = (h) => h.toLowerCase().replace(/\[.*?\]/g, '').trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
 
-const normalise = (h) => h.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+/** Split "Transport_Emissions_1994 [MtCO2e]" into { measure, year }. */
+function splitYearColumn(header) {
+  const m = slug(header).match(/^(.*?)_(\d{4})$/)
+  if (!m) return null
+  const year = Number(m[2])
+  if (year < 1900 || year > 2100) return null
+  return { measure: m[1], year }
+}
 
-function resolveColumns(headers) {
-  const normalised = headers.map(normalise)
-  const chosen = {}
-  const used = new Set()
+const num = (v) => {
+  const s = String(v ?? '').replace(/[, ]/g, '').trim()
+  if (s === '' || s === '-' || /^(na|n\/a|null|nan)$/i.test(s)) return null
+  const n = Number(s)
+  return Number.isFinite(n) ? n : null
+}
 
-  for (const [target, candidates] of Object.entries(MAPPING)) {
-    let index = -1
-    // Exact match first, then a contains-match, so "transport_co2_mt" still lands.
-    for (const candidate of candidates) {
-      index = normalised.findIndex((h, i) => h === candidate && !used.has(i))
-      if (index !== -1) break
-    }
-    if (index === -1) {
-      for (const candidate of candidates) {
-        index = normalised.findIndex((h, i) => h.includes(candidate) && !used.has(i))
-        if (index !== -1) break
-      }
-    }
-    if (index !== -1) used.add(index)
-    chosen[target] = index
-  }
-  return chosen
+const regionNames = new Intl.DisplayNames(['en'], { type: 'region' })
+function nameFor(alpha3) {
+  const a2 = toAlpha2(alpha3)
+  if (a2 === 'ZZ') return alpha3
+  try { return regionNames.of(a2) ?? alpha3 } catch { return alpha3 }
 }
 
 // ---------------------------------------------------------------------- main
 
 const args = process.argv.slice(2)
-const argOf = (flag) => {
-  const i = args.indexOf(flag)
-  return i === -1 ? null : args[i + 1]
-}
+const argOf = (f) => { const i = args.indexOf(f); return i === -1 ? null : args[i + 1] }
 
 let input = argOf('--in')
 if (!input) {
   if (!existsSync(RAW_DIR)) {
-    console.error(`No ${RAW_DIR}/ directory. Create it and put the GIZ download inside.`)
+    console.error(`No ${RAW_DIR}/ directory. Create it and put the export inside.`)
     process.exit(1)
   }
-  const candidates = readdirSync(RAW_DIR).filter((f) => /\.(csv|tsv|txt)$/i.test(f))
-  if (candidates.length === 0) {
-    console.error(`No CSV found in ${RAW_DIR}/. Put the GIZ download there.`)
+  const found = readdirSync(RAW_DIR).filter((f) => /\.csv$/i.test(f))
+  if (found.length === 0) {
+    console.error(
+      `No CSV in ${RAW_DIR}/.\n` +
+        `The GIZ download is an XLSX — open it in Excel and save Sheet1 as CSV first.`
+    )
     process.exit(1)
   }
-  if (candidates.length > 1) {
-    console.error(`Several CSVs in ${RAW_DIR}/ — pass --in <file>:\n  ${candidates.join('\n  ')}`)
+  if (found.length > 1) {
+    console.error(`Several CSVs in ${RAW_DIR}/ — pass --in <file>:\n  ${found.join('\n  ')}`)
     process.exit(1)
   }
-  input = join(RAW_DIR, candidates[0])
+  input = join(RAW_DIR, found[0])
 }
 
 const rows = parseCsv(readFileSync(input, 'utf8'))
-if (rows.length < 2) {
-  console.error(`${input} has no data rows.`)
-  process.exit(1)
-}
+if (rows.length < 2) { console.error(`${input} has no data rows.`); process.exit(1) }
 
 const headers = rows[0]
 const body = rows.slice(1)
 
 console.log(`\nSource: ${input}`)
-console.log(`Columns (${headers.length}): ${headers.join(' | ')}`)
-console.log(`Data rows: ${body.length}`)
-console.log('\nFirst two rows:')
-body.slice(0, 2).forEach((r) => console.log('  ' + r.join(' | ')))
+console.log(`Columns: ${headers.length}   Data rows: ${body.length}`)
 
-const columns = resolveColumns(headers)
-console.log('\nColumn mapping:')
-for (const [target, index] of Object.entries(columns)) {
-  console.log(
-    `  ${target.padEnd(20)} <- ${index === -1 ? '*** NOT FOUND ***' : `"${headers[index]}"`}`
-  )
-}
-
-if (args.includes('--inspect')) {
-  console.log('\n(--inspect: nothing written)')
-  process.exit(0)
-}
-
-const required = ['country_code', 'year', 'transport_mt_co2e']
-const missing = required.filter((t) => columns[t] === -1)
-if (missing.length) {
+// --- locate the country code column -----------------------------------------
+const codeIndex = headers.findIndex((h) => COUNTRY_CODE_HEADER.test(slug(h)))
+if (codeIndex === -1) {
   console.error(
-    `\nCannot continue — no column matched: ${missing.join(', ')}.` +
-      `\nAdd the real header name to MAPPING at the top of this script and re-run.`
+    `\nNo country-code column found. Headers start:\n  ${headers.slice(0, 8).join(' | ')}\n` +
+      `Add the real name to COUNTRY_CODE_HEADER at the top of this script.`
+  )
+  process.exit(1)
+}
+console.log(`Country code column: "${headers[codeIndex]}"`)
+
+// --- index the per-year columns ---------------------------------------------
+/** @type {Map<number, Record<string, number>>} year -> { ourColumn: headerIndex } */
+const byYear = new Map()
+const unmatchedMeasures = new Set()
+
+headers.forEach((header, i) => {
+  const split = splitYearColumn(header)
+  if (!split) return
+  const target = Object.entries(MEASURES).find(([, re]) => re.test(split.measure))?.[0]
+  if (!target) { unmatchedMeasures.add(split.measure); return }
+  if (!byYear.has(split.year)) byYear.set(split.year, {})
+  byYear.get(split.year)[target] = i
+})
+
+const years = [...byYear.keys()].sort((a, b) => a - b)
+if (!years.length) {
+  console.error(
+    `\nNo YEAR-suffixed columns found — this file may already be in long form,\n` +
+      `or the headers differ from what MEASURES expects. First headers:\n  ${headers.slice(0, 8).join(' | ')}`
   )
   process.exit(1)
 }
 
+console.log(`Years detected: ${years[0]}–${years.at(-1)} (${years.length} of them)`)
+console.log('Measures mapped:')
+for (const target of Object.keys(MEASURES)) {
+  const present = years.filter((y) => byYear.get(y)[target] !== undefined).length
+  const example = headers[byYear.get(years[0])[target]]
+  console.log(
+    `  ${target.padEnd(18)} ${String(present).padStart(3)}/${years.length} years` +
+      `${example ? `   e.g. "${example}"` : '   *** NOT FOUND ***'}`
+  )
+}
+if (unmatchedMeasures.size) {
+  console.log(`Ignored measures: ${[...unmatchedMeasures].join(', ')}`)
+}
+
+if (args.includes('--inspect')) { console.log('\n(--inspect: nothing written)\n'); process.exit(0) }
+
+if (byYear.get(years[0]).transport_mt_co2e === undefined) {
+  console.error('\nNo transport emissions column — cannot continue.')
+  process.exit(1)
+}
+
+// --- unpivot -----------------------------------------------------------------
 const out = [['country_code', 'country_name', 'year', 'transport_mt_co2e', 'total_mt_co2e']]
-const skipped = { noCode: 0, badYear: 0, noValue: 0 }
+const codes = new Set()
+let skippedCode = 0
+let emptyCells = 0
+
+// Cross-check of our reading of Global_Emissions (see MEASURES).
+let shareChecked = 0
+let shareMismatched = 0
+const mismatchExamples = []
 
 for (const r of body) {
-  const pick = (t) => (columns[t] === -1 ? '' : (r[columns[t]] ?? '').trim())
+  const code = String(r[codeIndex] ?? '').trim().toUpperCase()
+  if (!/^[A-Z]{3}$/.test(code)) { skippedCode++; continue }
+  codes.add(code)
+  const name = nameFor(code)
 
-  const code = pick('country_code').toUpperCase()
-  const year = pick('year').match(/\d{4}/)?.[0]
-  const transport = pick('transport_mt_co2e').replace(/[, ]/g, '')
+  for (const year of years) {
+    const cols = byYear.get(year)
+    const transport = num(r[cols.transport_mt_co2e])
+    if (transport === null) { emptyCells++; continue }
+    const total = cols.total_mt_co2e === undefined ? null : num(r[cols.total_mt_co2e])
 
-  if (!/^[A-Z]{3}$/.test(code)) { skipped.noCode++; continue }
-  if (!year || +year < 1970 || +year > 2100) { skipped.badYear++; continue }
-  if (transport === '' || Number.isNaN(Number(transport))) { skipped.noValue++; continue }
+    if (total !== null && total > 0 && cols.share_national !== undefined) {
+      const stated = num(r[cols.share_national])
+      if (stated !== null && stated > 0) {
+        shareChecked++
+        // The file states the share as a fraction; ours is transport ÷ total.
+        if (Math.abs(transport / total - stated) > 0.02) {
+          shareMismatched++
+          if (mismatchExamples.length < 3) {
+            mismatchExamples.push(
+              `${code} ${year}: computed ${(transport / total).toFixed(3)} vs stated ${stated.toFixed(3)}`
+            )
+          }
+        }
+      }
+    }
 
-  const total = pick('total_mt_co2e').replace(/[, ]/g, '')
-  out.push([
-    code,
-    pick('country_name') || code,
-    year,
-    transport,
-    total !== '' && !Number.isNaN(Number(total)) ? total : ''
-  ])
+    out.push([code, name, year, transport, total ?? ''])
+  }
 }
 
 const output = argOf('--out') ?? DEFAULT_OUT
 writeFileSync(output, toCsv(out), 'utf8')
 
-const countries = new Set(out.slice(1).map((r) => r[0]))
-const years = out.slice(1).map((r) => +r[2])
-
 console.log(`\nWrote ${output}`)
 console.log(`  rows:      ${out.length - 1}`)
-console.log(`  countries: ${countries.size}`)
-console.log(`  years:     ${Math.min(...years)}–${Math.max(...years)}`)
-console.log(
-  `  skipped:   ${skipped.noCode} without a 3-letter code, ` +
-    `${skipped.badYear} without a usable year, ${skipped.noValue} without a transport value`
-)
-console.log(
-  '\nRows without a 3-letter ISO code are usually aggregates such as WORLD or EU27.' +
-    '\nIf the skipped count looks high, run with --inspect and check the mapping.\n'
-)
+console.log(`  countries: ${codes.size}`)
+console.log(`  skipped:   ${skippedCode} rows without a 3-letter ISO code`)
+console.log(`  blank:     ${emptyCells} country-year cells with no transport figure`)
+
+// --- report the cross-check --------------------------------------------------
+console.log('\nSanity check — is Global_Emissions really the national total?')
+if (shareChecked === 0) {
+  console.log('  Could not check: no usable Share_Transport_National values.')
+} else if (shareMismatched / shareChecked > 0.05) {
+  console.log(
+    `  *** MISMATCH on ${shareMismatched} of ${shareChecked} checks ***\n` +
+      mismatchExamples.map((e) => `    ${e}`).join('\n') +
+      `\n  transport ÷ Global_Emissions does NOT match the file's own national share.\n` +
+      `  Global_Emissions is probably NOT the country total — do not load total_mt_co2e\n` +
+      `  until this is understood, or the dashboard's share-of-total will be wrong.`
+  )
+} else {
+  console.log(
+    `  OK — ${shareChecked - shareMismatched} of ${shareChecked} agree within 2 points.\n` +
+      `  Global_Emissions reads as the national all-sector total, as assumed.`
+  )
+}
+console.log('')

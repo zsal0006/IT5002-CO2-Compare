@@ -32,7 +32,7 @@ Legend: **M** = must-have, **S** = should-have, **X** = stretch.
 
 | # | Task | Pri |
 |---|------|-----|
-| T-1.1 | Download the GIZ country dataset; inspect columns; write the CSV → `country_transport_emissions` loader. | M |
+| T-1.1 | Export the GIZ XLSX to CSV, run `scripts/prepare-country-emissions.mjs`, check the Global_Emissions sanity check passes, then load via staging. | M |
 | T-1.2 | Download the Kaggle vehicle dataset; derive per-passenger-km car factors by fuel type (divide by 1.6 occupancy). | M |
 | T-1.3 | Replace every placeholder in `data/emission_factors.csv` with a sourced value; fill `source_id` and `retrieved_on`. | M |
 | T-1.4 | Run the seed scripts; verify row counts and spot-check five countries against the source portal. | M |
@@ -40,6 +40,7 @@ Legend: **M** = must-have, **S** = should-have, **X** = stretch.
 | T-1.6 | Build the `factors` Pinia store with a bundled fallback table for offline/Supabase-down. | M |
 | T-1.7 | Write `log_trip()` and `country_series()`; unit-test them in the SQL editor. | M |
 | T-1.8 | Verify every co-benefit constant in `lib/benefits.js` against its primary source; add `data_sources` rows and cite them on the Learn page. | S |
+| T-1.10 | Establish the GIZ/EDGAR dataset licence (null on the CKAN package) and the attribution it requires; record it in `data_sources`. | M |
 | T-1.9 | Replace the indicative pump prices in `0002_fuel_prices.sql` with checked figures from each national regulator; set `updated_on`. | S |
 
 **Done when:** `select count(*) from country_transport_emissions` returns a plausible number, every factor row has a non-null `source_id`, and an unauthorised insert fails.
@@ -133,7 +134,8 @@ Legend: **M** = must-have, **S** = should-have, **X** = stretch.
 |------|-----------|--------|-----------|
 | Nominatim/OSRM rate-limit or block the demo | Medium | High | Debounce, cache, and set a proper `User-Agent`. Fallback to haversine is already built. If it persists, switch to an OpenRouteService free key (budget: half a day). |
 | Kaggle dataset is per-vehicle-km, silently mixed with per-passenger-km | **High** | **High** | Unit is in the column name; T-1.2 makes the conversion an explicit task; a seed assertion fails if any car factor exceeds 400 g/p-km. |
-| GIZ dataset shape differs from expectation | Medium | Medium | T-1.1 inspects before loading; the loader is CSV-driven, so a column rename is a one-line change. |
+| GIZ dataset shape differs from expectation | **Confirmed** | Medium | It did: the file is a wide XLSX (~552 columns), not a long CSV. The loader now unpivots it and reports its column mapping before writing. |
+| `Global_Emissions` is not the national total, making share-of-total wrong | Medium | High | The loader cross-checks it against the file's own `Share_Transport_National` and refuses to vouch for the load if they disagree. |
 | Scope creep into routing per mode | Medium | Medium | FR-7 is explicitly stretch and gated behind all Must items. |
 | Supabase free-tier project paused for inactivity | Low | Medium | Bundled fallback factors keep the calculator alive; a weekly ping keeps the project warm before the demo. |
 | Choropleth is unreadable because a few countries dominate the scale | **High** | Medium | Quantile breaks rather than equal intervals, with the real range printed per legend bin. Already built; verify with real data at T-4.9. |
