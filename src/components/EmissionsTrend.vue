@@ -102,7 +102,13 @@ const covid = computed(() => {
   const { x } = geometry.value
   const from = Math.max(lo, 2019.5)
   const to = Math.min(hi, 2021.5)
-  return { x: x(from).toFixed(1), width: Math.max(0, x(to) - x(from)).toFixed(1) }
+  return {
+    x: x(from).toFixed(1),
+    width: Math.max(0, x(to) - x(from)).toFixed(1),
+    // The label hangs off the left edge of the band (see the template's
+    // translateX), so this is the band's own left edge as a percentage.
+    labelLeft: `${((x(from) / WIDTH) * 100).toFixed(2)}%`
+  }
 })
 
 const xTicks = computed(() => {
@@ -229,7 +235,7 @@ const insights = computed(() => {
             />
           </svg>
 
-          <span v-if="covid" class="covid-label">2020–21 lockdowns</span>
+          <span v-if="covid" class="covid-label" :style="{ left: covid.labelLeft }">2020–21 lockdowns</span>
           <span v-if="marker" class="dot" :style="{ left: marker.left, top: marker.top }" aria-hidden="true" />
         </div>
 
@@ -330,14 +336,18 @@ const insights = computed(() => {
 .line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
 .cursor { stroke: var(--text-primary); stroke-width: 1; stroke-dasharray: 3 3; }
 
+/* Sits immediately left of the band it names, rather than floating at the
+   edge of the chart where it reads as a title for the whole thing. */
 .covid-label {
   position: absolute;
   top: 0.375rem;
-  left: 0;
+  transform: translateX(-100%);
+  padding-right: 0.375rem;
   font-size: 0.6875rem;
   font-weight: 600;
   color: var(--series-1-soft-text);
   white-space: nowrap;
+  pointer-events: none;
 }
 
 .dot {
