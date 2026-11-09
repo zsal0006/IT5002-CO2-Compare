@@ -88,48 +88,75 @@ function swapEnds() {
   <div class="container page">
     <div class="layout" :class="{ centred: editing }">
       <!-- ------------------------------------------------------------ E1 -- -->
+      <!--
+        On a wide screen the form alone is a 30rem card adrift in 1900px of
+        empty page. The heading and the lead move out of the card and take the
+        space beside it, so the width carries the page's one idea instead of
+        nothing. Below 60rem the two stack and read as one column.
+      -->
+      <div v-if="editing" class="intro">
+        <h1>Compare your commute</h1>
+        <p class="lead">See the CO₂ cost of every way to make the trip.</p>
+
+        <ul class="points">
+          <li>
+            <strong>Every way of making it.</strong>
+            Walking, cycling, bus, train and car, ranked by what each one emits.
+          </li>
+          <li>
+            <strong>What the swap is actually worth.</strong>
+            Fuel money, petrol left in the ground, steps and calories — not only kilograms.
+          </li>
+          <li>
+            <strong>Log the trip you took.</strong>
+            It joins the running total on the Impact page. No addresses are kept.
+          </li>
+        </ul>
+      </div>
+
       <form v-if="editing" class="card trip" @submit.prevent="onCalculate">
+
+        <!-- One journey, one control: both ends inside a single box, joined by
+             a dotted rail from the start dot to the destination square, with
+             the swap button straddling the seam. Two separately bordered
+             fields stacked up would read as two unrelated questions. -->
         <div>
-          <h1>Compare your commute</h1>
-          <p class="lead">See the CO₂ cost of every way to make the trip.</p>
-        </div>
-
-        <div class="route">
-          <!-- The rail: a dot, a dashed run and a square, tying the two fields
-               into one journey rather than two unrelated inputs. -->
-          <div class="rail" aria-hidden="true">
-            <span class="dot" />
-            <span class="line" />
-            <span class="square" />
-          </div>
-
-          <div class="fields">
+          <div class="route-box">
             <LocationInput
               v-model="origin"
+              class="end-row"
               label="From"
-              placeholder="Enter start address"
+              placeholder="Start address"
+              marker="dot"
               allow-current-location
             />
+
+            <span class="divider" aria-hidden="true" />
+
+            <button
+              type="button"
+              class="swap"
+              aria-label="Swap start and destination"
+              :disabled="!origin && !destination"
+              @click="swapEnds"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" />
+              </svg>
+            </button>
+
             <LocationInput
               v-model="destination"
+              class="end-row"
               label="To"
-              placeholder="Enter destination"
+              placeholder="Destination"
+              marker="square"
               :bias="origin"
             />
           </div>
 
-          <button
-            type="button"
-            class="swap"
-            aria-label="Swap start and end"
-            :disabled="!origin && !destination"
-            @click="swapEnds"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" />
-            </svg>
-          </button>
+          <p class="route-hint">Type a place and press Enter to search.</p>
         </div>
 
         <div v-if="carOptions.length" class="field">
@@ -142,9 +169,8 @@ function swapEnds() {
         </div>
 
         <div class="toggle-row">
-          <span>
-            <span class="toggle-title">Return trip</span>
-            <span class="toggle-sub">Doubles the distance</span>
+          <span class="toggle-title">
+            Return trip <span class="toggle-sub">· doubles the distance</span>
           </span>
           <button
             type="button"
@@ -159,18 +185,20 @@ function swapEnds() {
           </button>
         </div>
 
-        <button type="submit" :disabled="!trip.ready || trip.calculating">
-          {{ trip.calculating ? 'Calculating…' : 'Compare routes' }}
-        </button>
+        <div class="submit">
+          <button type="submit" :disabled="!trip.ready || trip.calculating">
+            {{ trip.calculating ? 'Calculating…' : 'Compare routes' }}
+          </button>
 
-        <p class="privacy">
+          <p class="privacy">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="5" y="11" width="14" height="10" rx="2" />
             <path d="M8 11V7a4 4 0 0 1 8 0v4" />
           </svg>
-          Addresses are never stored.
-        </p>
+            Addresses are never stored.
+          </p>
+        </div>
 
         <p v-if="factorsStore.usingFallback" class="notice">{{ factorsStore.error }}</p>
       </form>
@@ -231,18 +259,58 @@ function swapEnds() {
 </template>
 
 <style scoped>
-.page { padding: 2rem 0 3.5rem; }
+/*
+ * Takes whatever height the shell has left, so the editing state can sit in
+ * the middle of the screen instead of in a band under the header.
+ */
+.page {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2.5rem 0 3rem;
+}
 
 /*
- * One pane at a time. While editing, the form is alone and centred at reading
- * width; once there are results it has the full column to itself. Nothing here
- * ever reserves space for a pane that is not on screen.
+ * One pane at a time. While editing, the page is an intro beside the form;
+ * once there are results, the results have the full column to themselves.
+ * Nothing here ever reserves space for a pane that is not on screen.
  */
 .layout { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-start; }
-.layout.centred { justify-content: center; }
 
-.trip { flex: 1 1 320px; max-width: 100%; display: flex; flex-direction: column; gap: 1.25rem; }
-.centred .trip { flex: 0 1 30rem; }
+/*
+ * The editing state. It uses the container's full width on a large monitor —
+ * the earlier 62rem cap is what left the card looking postage-stamp sized on
+ * a 1900px screen — but the text column is capped separately below, because
+ * prose set across 700px is unreadable however much room there is.
+ *
+ * The form card grows with the viewport instead of staying at a fixed 30rem.
+ */
+.layout.centred {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, clamp(26rem, 32vw, 38rem));
+  gap: clamp(2.5rem, 6vw, 7rem);
+  align-items: center;
+  margin-inline: auto;
+}
+
+@media (max-width: 62rem) {
+  .layout.centred {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.75rem;
+    align-items: start;
+    max-width: 32rem;
+  }
+}
+
+.trip {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+  padding: clamp(1.5rem, 1.1rem + 1vw, 2.25rem);
+}
+.submit { display: flex; flex-direction: column; gap: 0.625rem; }
 
 .results { flex: 1 1 100%; min-width: 0; display: flex; flex-direction: column; gap: 1.25rem; }
 
@@ -257,44 +325,135 @@ function swapEnds() {
   font-size: 0.875rem;
 }
 
-.trip h1 { margin: 0; font-size: 1.625rem; }
-.lead { margin: 0.375rem 0 0; font-size: 0.875rem; color: var(--text-secondary); }
+/* --- the intro column --------------------------------------------------- */
+/* The column may be 700px wide on a large monitor; the text inside it is not. */
+.intro { min-width: 0; max-width: 34rem; }
 
-/* --- the route rail ---------------------------------------------------- */
-.route { display: flex; gap: 0.75rem; align-items: stretch; }
-
-.rail { display: flex; flex-direction: column; align-items: center; padding: 2.1rem 0 1.1rem; }
-.dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--text-primary); }
-.line {
-  flex: 1;
-  width: 2px;
-  margin: 4px 0;
-  background: repeating-linear-gradient(var(--axis) 0 4px, transparent 4px 8px);
+/* Fluid rather than stepped: the heading is the only thing on this page that
+   can afford to use the width, so it tracks it instead of jumping at a
+   breakpoint. */
+.intro h1 {
+  margin: 0;
+  font-size: clamp(1.875rem, 1.1rem + 2.6vw, 3.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.025em;
 }
-.square { width: 10px; height: 10px; border-radius: 2px; background: var(--accent); }
+.lead {
+  margin: 0.75rem 0 0;
+  font-size: clamp(1rem, 0.95rem + 0.35vw, 1.25rem);
+  color: var(--text-secondary);
+  max-width: 34rem;
+}
 
-.fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.625rem; }
+.points {
+  list-style: none;
+  margin: 1.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: clamp(0.875rem, 0.7rem + 0.5vw, 1.25rem);
+  max-width: 34rem;
+  font-size: clamp(0.9375rem, 0.9rem + 0.25vw, 1.0625rem);
+  color: var(--text-secondary);
+}
+.points li { padding-left: 1.375rem; position: relative; line-height: 1.5; }
 
+/* A small square in the accent, matching the destination marker in the box —
+   the same mark doing the same job, rather than a new bullet shape. */
+.points li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.points strong { display: block; color: var(--text-primary); font-weight: 600; }
+
+/* Kept, not hidden: it is the only place the page says what logging a trip
+   does. It just stops taking a block of space before the form is reachable. */
+@media (max-width: 62rem) {
+  .points { margin-top: 1.125rem; gap: 0.625rem; font-size: 0.875rem; }
+}
+
+/* --- the journey box ---------------------------------------------------- */
+.route-box {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+/*
+ * The marker column is widened from the design's 14px so the swap button can
+ * live inside it: the markers' centre line lands at 29px, which leaves the
+ * 36px button an 11px inset from the box edge.
+ */
+.route-box .end-row { padding-left: 1.5rem; }
+
+/* Runs from the marker column to just short of the box edge. */
+.divider {
+  display: block;
+  height: 1px;
+  margin: 0 0.875rem 0 48px;
+  background: var(--border);
+}
+
+/*
+ * The swap sits on the markers' own centre line, between the start dot and the
+ * destination square — the column that already stands for the journey. On the
+ * right it had to share an edge with "use my current location", and the two
+ * round buttons read as a pair when they do unrelated things.
+ *
+ * It replaces the dotted rail rather than covering it: at 56px rows the button
+ * leaves 5px above and below, which would show as a stray dot at each end
+ * rather than as a line passing behind. Three elements in one column connect
+ * the two ends on their own.
+ */
 .swap {
-  align-self: center;
-  width: 44px;
-  height: 44px;
-  flex: none;
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
   padding: 0;
   border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--surface-1);
+  /* --axis, not --border: at 26px on white, the card's hairline left the
+     button looking like a loose glyph rather than a control. */
+  border: 1px solid var(--axis);
+  background: var(--surface-2);
   color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.swap:hover:not(:disabled) { border-color: var(--axis); }
+.swap:hover:not(:disabled) { background: var(--surface-1); border-color: var(--text-secondary); }
+
+/*
+ * Drawn at 26px so it sits between the markers without becoming the loudest
+ * thing in the box, but clickable over 36px. Stretching the target any further
+ * would reach past the markers into the text the two inputs start with.
+ */
+.swap::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 36px;
+  height: 36px;
+  transform: translate(-50%, -50%);
+}
+
+.route-hint { margin: 0.5rem 0 0; font-size: 0.75rem; color: var(--text-secondary); }
 
 /* --- the return switch -------------------------------------------------- */
 .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
-.toggle-title { display: block; font-size: 0.875rem; font-weight: 600; }
-.toggle-sub { display: block; font-size: 0.8125rem; color: var(--text-secondary); }
+.toggle-title { font-size: 0.875rem; font-weight: 600; }
+.toggle-sub { font-weight: 400; color: var(--text-secondary); }
 
 .switch {
   width: 52px;
@@ -321,12 +480,32 @@ function swapEnds() {
 }
 .switch.on .knob { left: 25px; }
 
+/*
+ * The submit control is the one thing on this card that is a decision, so it
+ * is drawn larger than the 44px floor the rest of the app uses.
+ */
+.trip [type='submit'] { height: 50px; border-radius: var(--radius-md); font-size: 0.9375rem; }
+.trip select { height: 48px; border-radius: var(--radius-md); }
+
+/*
+ * On a large monitor the controls grow with the card rather than sitting as a
+ * strip of 48px rows inside a much bigger box.
+ */
+@media (min-width: 80rem) {
+  .route-box .end-row { height: 62px; }
+  .trip select { height: 54px; }
+  .trip [type='submit'] { height: 56px; font-size: 1rem; }
+  .route-hint { font-size: 0.8125rem; }
+}
+
+/* Centred under the button it qualifies, not ranged left against the card. */
 .privacy {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  gap: 0.375rem;
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
 }
 

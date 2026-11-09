@@ -181,6 +181,23 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+ * The app shell is a full-height column so the footer sits on the bottom of
+ * the viewport, not wherever the content happens to stop. A short page — the
+ * compare form before anything is entered — otherwise ends halfway down a
+ * desktop screen with the footer floating in the middle of it.
+ *
+ * dvh rather than vh: on mobile browsers vh is the height with the URL bar
+ * hidden, so 100vh leaves the page scrollable by exactly the bar's height.
+ */
+#app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+#app > main { flex: 1 1 auto; display: flex; flex-direction: column; }
+
 h1, h2, h3 {
   font-family: var(--font-display);
   line-height: 1.15;
