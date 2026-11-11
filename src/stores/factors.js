@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
 import { FALLBACK_FACTORS, FALLBACK_FUEL_PRICE } from '@/lib/fallbackFactors'
 import { DEFAULT_COUNTRY_A2 } from '@/lib/locale'
@@ -15,12 +15,6 @@ export const useFactorsStore = defineStore('factors', () => {
   const loading = ref(false)
   const usingFallback = ref(false)
   const error = ref(null)
-
-  const baseline = computed(() => factors.value.find((f) => f.is_baseline) ?? null)
-
-  const byKey = computed(() =>
-    Object.fromEntries(factors.value.map((f) => [f.mode_key, f]))
-  )
 
   /**
    * Pump price for a country. Australia is the default market, so an unknown
@@ -88,6 +82,6 @@ export const useFactorsStore = defineStore('factors', () => {
 
   return {
     factors, sources, fuelPrices, loading, error, usingFallback,
-    baseline, byKey, fuelPriceFor, load
+    fuelPriceFor, load
   }
 })

@@ -1,10 +1,9 @@
 /**
  * Distance between two points.
  *
- * Primary source is OSRM's public demo server, which gives real road distance
- * and a route geometry we can draw on a map. It is a best-effort service with
- * no availability guarantee, so every call is bounded by a timeout and falls
- * back to a great-circle estimate (NFR-7).
+ * Primary source is OSRM's public demo server, which gives real road distance.
+ * It is a best-effort service with no availability guarantee, so every call is
+ * bounded by a timeout and falls back to a great-circle estimate (NFR-7).
  */
 
 const OSRM_BASE = 'https://router.project-osrm.org/route/v1'
@@ -40,8 +39,6 @@ export function haversineKm(a, b) {
  * @typedef {object} RouteResult
  * @property {number}  km            distance in kilometres
  * @property {boolean} approximate   true when the OSRM call did not succeed
- * @property {Array<[number,number]>|null} geometry [lat, lon] pairs for the map
- * @property {number|null} durationMin driving duration, when OSRM answered
  */
 
 /**
@@ -53,7 +50,7 @@ export function haversineKm(a, b) {
 export async function routeDistance(from, to, options = {}) {
   const profile = options.profile ?? 'driving'
   const coords = `${from.lon},${from.lat};${to.lon},${to.lat}`
-  const url = `${OSRM_BASE}/${profile}/${coords}?overview=simplified&geometries=geojson`
+  const url = `${OSRM_BASE}/${profile}/${coords}?overview=false`
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
@@ -67,18 +64,13 @@ export async function routeDistance(from, to, options = {}) {
 
     return {
       km: route.distance / 1000,
-      approximate: false,
-      // GeoJSON is [lon, lat]; Leaflet wants [lat, lon].
-      geometry: route.geometry?.coordinates?.map(([lon, lat]) => [lat, lon]) ?? null,
-      durationMin: route.duration ? route.duration / 60 : null
+      approximate: false
     }
   } catch (err) {
     console.warn('[CO2 Compare] routing fell back to straight-line distance:', err.message)
     return {
       km: haversineKm(from, to) * DETOUR_FACTOR,
-      approximate: true,
-      geometry: null,
-      durationMin: null
+      approximate: true
     }
   } finally {
     clearTimeout(timer)

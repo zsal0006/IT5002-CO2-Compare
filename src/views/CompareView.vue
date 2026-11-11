@@ -10,6 +10,7 @@ import { useFactorsStore } from '@/stores/factors'
 import { useStatsStore } from '@/stores/stats'
 import { formatCo2 } from '@/lib/format'
 import { DETOUR_FACTOR } from '@/lib/routing'
+import { ALTERNATIVE_MODE_KEYS } from '@/lib/emissions'
 
 /** E1, E2, E3 — define a trip, compare the modes, log the one you took. */
 const trip = useTripStore()
@@ -40,6 +41,11 @@ const editing = ref(true)
 onMounted(() => factorsStore.load())
 
 const carOptions = computed(() => factorsStore.factors.filter((f) => f.category === 'car'))
+
+/** Only the four supported alternatives are selectable in the comparison UI. */
+const modeOptions = computed(() =>
+  trip.comparison.filter((mode) => ALTERNATIVE_MODE_KEYS.includes(mode.modeKey))
+)
 
 /** Pump price for the country the trip starts in (never stored with the trip). */
 const fuelPrice = computed(() => factorsStore.fuelPriceFor(origin.value?.countryCode ?? 'ZZ'))
@@ -101,7 +107,7 @@ function swapEnds() {
         <ul class="points">
           <li>
             <strong>Every way of making it.</strong>
-            Walking, cycling, bus, train and car, ranked by what each one emits.
+            Bike, walking, train and bus, compared with your chosen car.
           </li>
           <li>
             <strong>What the swap is actually worth.</strong>
@@ -223,7 +229,7 @@ function swapEnds() {
 
           <JourneyHero
             v-model="chosenMode"
-            :modes="trip.allModes"
+            :modes="modeOptions"
             :baseline="baseline"
             :distance-km="trip.effectiveKm"
             :return-trip="returnTrip"
@@ -241,7 +247,7 @@ function swapEnds() {
 
           <TripLogger
             v-model="chosenMode"
-            :modes="trip.allModes"
+            :modes="modeOptions"
             :logging="trip.logging"
             :last-log="trip.lastLog"
             @log="onLog"

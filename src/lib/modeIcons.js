@@ -47,7 +47,7 @@ export function iconFor(modeKey) {
  * reads sensibly instead of being blank.
  */
 const SHORT_NAMES = {
-  walking: 'Walk',
+  walking: 'Walking',
   cycling: 'Bike',
   e_scooter: 'Scooter',
   coach: 'Coach',

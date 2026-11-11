@@ -99,16 +99,9 @@ export const useCountriesStore = defineStore('countries', () => {
     }
   }
 
-  /** The most recent year with a transport figure, for the headline tiles. */
-  function latest(code) {
-    const rows = series.value[code]
-    if (!rows?.length) return null
-    return [...rows].reverse().find((r) => r.transport_mt_co2e != null) ?? null
-  }
-
   return {
     list, series, snapshot, snapshotYear,
     loadingList, loadingSeries, loadingSnapshot, error,
-    loadList, loadSeries, loadSnapshot, latest
+    loadList, loadSeries, loadSnapshot
   }
 })

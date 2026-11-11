@@ -63,7 +63,7 @@ const tooShort = computed(
 const status = computed(() => {
   if (searching.value) return 'Searching…'
   if (message.value) return message.value
-  if (tooShort.value) return `Keep typing — at least ${MIN_CHARS} characters.`
+  if (tooShort.value) return `Minimum ${MIN_CHARS} characters.`
   if (candidates.value.length) {
     return `${candidates.value.length} match${candidates.value.length === 1 ? '' : 'es'} — pick one, or use the arrow keys and Enter.`
   }

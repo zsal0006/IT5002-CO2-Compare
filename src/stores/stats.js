@@ -3,12 +3,11 @@ import { ref } from 'vue'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
 
 /**
- * Community totals: globally, by country, by region and by mode (E4.1, E4.2).
- * All four are database views over trip_logs — the client never aggregates.
+ * Community totals: globally, by region and by mode (E4.1, E4.2).
+ * The database aggregates trip_logs; the client only shapes the results.
  */
 export const useStatsStore = defineStore('stats', () => {
   const global = ref(null)        // { trips, total_saved_kg, ... }
-  const byCountry = ref([])       // [{ country_code, trips, total_saved_kg, ... }]
   const byRegion = ref([])        // [{ country_code, region_name, ... }]
   const byMode = ref([])          // [{ mode_key, mode_label, total_saved_kg, ... }]
   const byRegionMode = ref([])    // [{ country_code, region_name, mode_key, ... }]
@@ -24,16 +23,14 @@ export const useStatsStore = defineStore('stats', () => {
     loading.value = true
     error.value = null
     try {
-      const [g, c, r, m, rm] = await Promise.all([
+      const [g, r, m, rm] = await Promise.all([
         supabase.from('v_savings_global').select('*').single(),
-        supabase.from('v_savings_by_country').select('*').order('total_saved_kg', { ascending: false }),
         supabase.from('v_savings_by_region').select('*').order('total_saved_kg', { ascending: false }),
         supabase.from('v_savings_by_mode').select('*').order('total_saved_kg', { ascending: false }),
         supabase.from('v_savings_by_region_mode').select('*').order('total_saved_kg', { ascending: false })
       ])
       if (g.error) throw g.error
       global.value = g.data
-      byCountry.value = c.data ?? []
       byRegion.value = r.data ?? []
       byMode.value = m.data ?? []
       // Added by migration 0004. A project that has not applied it yet still
@@ -52,21 +49,6 @@ export const useStatsStore = defineStore('stats', () => {
     }
   }
 
-  function forCountry(code) {
-    return byCountry.value.find((row) => row.country_code === code) ?? null
-  }
-
-  /** @param {string} code alpha-2 @param {string|null} region */
-  function forRegion(code, region) {
-    const name = region || 'Unknown region'
-    return byRegion.value.find((row) => row.country_code === code && row.region_name === name) ?? null
-  }
-
-  /** Regions within one country, for the Impact page selector. */
-  function regionsIn(code) {
-    return byRegion.value.filter((row) => row.country_code === code)
-  }
-
   /** Mode rows for one region, for the Impact page's scope switch. */
   function modesInRegion(code, region) {
     const name = region || 'Unknown region'
@@ -76,7 +58,7 @@ export const useStatsStore = defineStore('stats', () => {
   }
 
   return {
-    global, byCountry, byRegion, byMode, byRegionMode, loading, error,
-    load, forCountry, forRegion, regionsIn, modesInRegion
+    global, byRegion, byMode, byRegionMode, loading, error,
+    load, modesInRegion
   }
 })

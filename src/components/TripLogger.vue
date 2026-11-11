@@ -1,15 +1,13 @@
 <script setup>
 import { computed } from 'vue'
-import { iconFor } from '@/lib/modeIcons'
+import { iconFor, shortName } from '@/lib/modeIcons'
 import { formatCo2 } from '@/lib/format'
 
 /**
- * E3 — "which did you actually take?", as a row of icon buttons.
+ * E3 — "which did you actually take?", as a row of labeled mode buttons.
  *
- * Icon-only buttons, so each carries both `aria-label` and `title`: the first
- * for assistive tech, the second so a sighted reader who does not recognise a
- * glyph can hover it. The selected mode is also named in text beside the
- * button, which is what makes the row usable without either.
+ * Visible labels keep the choices clear without requiring the reader to
+ * recognise the icons; the accessible name matches the displayed label.
  */
 const props = defineProps({
   /** ModeResult[] for this journey. */
@@ -24,12 +22,14 @@ const emit = defineEmits(['update:modelValue', 'log'])
 const chosen = computed(() => props.modes.find((m) => m.modeKey === props.modelValue) ?? null)
 
 const items = computed(() =>
-  props.modes.map((m) => ({ ...m, icon: iconFor(m.modeKey) }))
+  props.modes.map((m) => ({ ...m, icon: iconFor(m.modeKey), short: shortName(m.modeKey, m.label) }))
 )
 
 const buttonLabel = computed(() => {
   if (props.logging) return 'Logging…'
-  return chosen.value ? `Log ${chosen.value.label.toLowerCase()} trip` : 'Log this trip'
+  return chosen.value
+    ? `Log ${shortName(chosen.value.modeKey, chosen.value.label).toLowerCase()} trip`
+    : 'Log this trip'
 })
 </script>
 
@@ -37,9 +37,7 @@ const buttonLabel = computed(() => {
   <section class="card logger" aria-labelledby="log-heading">
     <div class="head">
       <h2 id="log-heading">How did you travel today?</h2>
-      <p class="hint">
-        {{ chosen ? `${chosen.label} selected` : 'Choose the way you travelled.' }}
-      </p>
+      <p class="hint">{{ chosen ? `${shortName(chosen.modeKey, chosen.label)} selected` : 'Choose how you travelled.' }}</p>
       <button
         type="button"
         class="primary"
@@ -57,8 +55,8 @@ const buttonLabel = computed(() => {
         type="button"
         class="glyph"
         :class="{ on: m.modeKey === modelValue }"
-        :aria-label="m.label"
-        :title="m.label"
+        :aria-label="m.short"
+        :title="m.short"
         :aria-pressed="String(m.modeKey === modelValue)"
         @click="emit('update:modelValue', m.modeKey)"
       >
@@ -66,6 +64,7 @@ const buttonLabel = computed(() => {
              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path :d="m.icon" />
         </svg>
+        <span>{{ m.short }}</span>
       </button>
     </div>
 
@@ -87,20 +86,23 @@ const buttonLabel = computed(() => {
 .hint { flex: 1 1 160px; margin: 0; font-size: 0.75rem; color: var(--text-secondary); }
 .head button { min-height: 36px; font-size: 0.8125rem; }
 
-.grid { display: flex; flex-wrap: wrap; gap: 0.375rem; }
+.grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; }
 
 .glyph {
-  width: 44px;
-  height: 44px;
-  min-height: 44px;
-  padding: 0;
+  min-width: 0;
+  min-height: 64px;
+  padding: 0.5rem 0.375rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-1);
   color: var(--text-secondary);
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .glyph:hover { border-color: var(--axis); color: var(--text-primary); }

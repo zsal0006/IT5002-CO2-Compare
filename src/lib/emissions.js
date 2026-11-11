@@ -41,7 +41,7 @@ export function emissionsKg(distanceKm, factorGPerPkm) {
 
 /**
  * Saving versus the baseline mode. Clamped at zero: the leaderboard counts
- * avoided emissions, not a net ledger (see docs/04 §4.3).
+ * avoided emissions, not a net ledger.
  */
 export function savedKg(distanceKm, factorGPerPkm, baselineGPerPkm) {
   return Math.max(0, emissionsKg(distanceKm, baselineGPerPkm) - emissionsKg(distanceKm, factorGPerPkm))
@@ -79,17 +79,8 @@ export function compare(distanceKm, factors, options = {}) {
     .sort((a, b) => a.kg - b.kg || a.label.localeCompare(b.label))
 }
 
-/** The five modes the headline comparison shows (FR-4). */
-export const HEADLINE_MODES = ['car_average', 'bus_city', 'train_national', 'cycling', 'walking']
+/** The four alternatives shown to users, in the intended display order. */
+export const ALTERNATIVE_MODE_KEYS = ['cycling', 'walking', 'train_national', 'bus_city']
 
-/**
- * Everyday equivalences, used to make a bare kilogram figure mean something.
- * Each is a deliberate, citable approximation — see the Learn page.
- */
-export function equivalences(kg) {
-  return [
-    { label: 'km driven in an average car', value: kg / 0.17 },
-    { label: 'smartphone charges', value: kg / 0.0083 },
-    { label: 'days a mature tree takes to absorb this', value: kg / 0.06 }
-  ]
-}
+/** The alternatives plus the car reference used to calculate savings (FR-4). */
+export const HEADLINE_MODES = ['car_average', ...ALTERNATIVE_MODE_KEYS]

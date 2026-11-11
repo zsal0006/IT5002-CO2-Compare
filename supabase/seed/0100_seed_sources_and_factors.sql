@@ -3,7 +3,7 @@
 --
 -- UNIT: grams CO2e per PASSENGER-kilometre.
 -- The Kaggle vehicle dataset is per VEHICLE-kilometre — divide by occupancy
--- (1.6 for private cars) before putting a value here. See docs/04.
+-- (1.6 for private cars) before putting a value here.
 
 insert into public.data_sources (source_id, title, publisher, url, licence, retrieved_on) values
   ('desnz-2024',
@@ -60,13 +60,13 @@ on conflict (mode_key) do update set
   notes            = excluded.notes,
   is_active        = true;
 
--- Guard rail for the per-vehicle vs per-passenger unit mix-up (docs/04 risk).
+-- Guard rail against loading per-vehicle values as per-passenger values.
 do $guard$
 begin
   if exists (select 1 from public.emission_factors
              where category = 'car' and factor_g_per_pkm > 400) then
     raise exception
-      'A car factor exceeds 400 g/passenger-km. Did you load per-VEHICLE-km values without dividing by occupancy? See docs/04-datasets-and-methodology.md';
+      'A car factor exceeds 400 g/passenger-km. Did you load per-VEHICLE-km values without dividing by occupancy?';
   end if;
   if not exists (select 1 from public.emission_factors where is_baseline) then
     raise exception 'No baseline mode is flagged; savings cannot be computed.';

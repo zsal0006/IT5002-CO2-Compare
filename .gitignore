@@ -24,3 +24,6 @@ docs/
 # committed, so nobody else needs Excel or the original file.
 *.xlsx
 *.xls
+COMPONENT-MAP.md
+STREAMLINING-PLAN.md
+IT5002-CO2-Compare.code-workspace

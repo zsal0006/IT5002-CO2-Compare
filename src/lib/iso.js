@@ -5,8 +5,8 @@
  * what Nominatim returns). Truncating "AUT" to "AU" would silently credit
  * Austria's savings to Australia, so the mapping is explicit.
  *
- * Sprint 1, T-1.1: after loading the GIZ file, run `missingAlpha2(codes)` below
- * against its distinct country codes and add anything it reports.
+ * Used by the emissions-data preparation script to match alpha-3 dataset codes
+ * to the alpha-2 codes returned by Nominatim.
  */
 const ISO3_TO_ISO2 = {
   ABW: 'AW', AFG: 'AF', AGO: 'AO', AIA: 'AI', ALA: 'AX', ALB: 'AL', AND: 'AD',
@@ -57,10 +57,3 @@ export function toAlpha2(alpha3) {
   if (!alpha3) return 'ZZ'
   return ISO3_TO_ISO2[alpha3.toUpperCase()] ?? 'ZZ'
 }
-
-/** Codes in the dataset that this table does not cover. Used by T-1.1. */
-export function missingAlpha2(alpha3Codes) {
-  return alpha3Codes.filter((c) => !ISO3_TO_ISO2[String(c).toUpperCase()])
-}
-
-export { ISO3_TO_ISO2 }

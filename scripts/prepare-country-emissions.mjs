@@ -22,8 +22,8 @@
  * names are derived from `src/lib/iso.js` plus Intl.DisplayNames.
  *
  * The file is XLSX and its CKAN datastore is empty, so there is no CSV to
- * download and no API to query. Open the XLSX in Excel and save Sheet1 as CSV
- * first — see docs/06 §6.4.
+ * download and no API to query. Convert the workbook to CSV first with
+ * `python scripts/xlsx-to-csv.py input.xlsx output.csv`.
  * ---------------------------------------------------------------------------
  */
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs'

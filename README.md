@@ -1,6 +1,6 @@
 # CO2 Compare
 
-Compare the carbon cost of a journey by car, bus, train, bicycle and on foot — then
+Compare the carbon cost of a journey by car, bike, walking, train and bus — then
 log what you actually took and watch the avoided emissions add up across your country
 and the world.
 
@@ -16,14 +16,14 @@ cp .env.example .env.local     # Windows: copy .env.example .env.local
 npm run dev                    # http://localhost:5173
 ```
 
-The calculator works immediately using bundled emission factors. For the dashboard and
-trip logging you need a Supabase project — see
-[docs/06-setup-guide.md](docs/06-setup-guide.md).
+The calculator works immediately using bundled emission factors. The dashboard,
+methodology source list, and trip logging need a Supabase project configured in
+`.env.local`.
 
 ## What it does
 
-- **Compare** — enter two places, get kg CO₂e for five transport modes over that
-  route, and log the mode you actually took.
+- **Compare** — enter two places, compare bike, walking, train and bus against a
+  car baseline, and log the mode you actually took.
 - **Impact** — what everyone has avoided, by region and globally, broken down by
   transport mode.
 - **Dashboard** — a world map shaded by transport emissions, plus any country's
@@ -33,8 +33,8 @@ trip logging you need a Supabase project — see
 
 ## Stack
 
-Vue 3 (Composition API) · Vite · Pinia · Vue Router · Chart.js · Supabase (Postgres) ·
-Nominatim and OSRM for geocoding and routing.
+Vue 3 (Composition API) · Vite · Pinia · Vue Router · Supabase (Postgres) ·
+Nominatim and OSRM for geocoding and routing. Charts are rendered with SVG and CSS.
 
 No custom backend: the one operation that cannot be trusted to the browser — computing
 the CO₂ saved before it is written to a shared total — is a `SECURITY DEFINER` Postgres
@@ -42,10 +42,9 @@ function.
 
 ## Deployment
 
-Hosted on **Vercel**. Pushes to `main` deploy to production; every pull request gets a
-preview URL. Build settings, the SPA rewrite and asset cache headers live in
-`vercel.json` — the only manual step is adding the two `VITE_` environment variables
-in the Vercel dashboard. Full walkthrough in [docs/06 §6.6](docs/06-setup-guide.md).
+The repository includes Vercel build, SPA rewrite, and asset cache configuration in
+`vercel.json`. Configure the two `VITE_` environment variables in the deployment
+environment.
 
 > `VITE_` variables are compiled into the client bundle. Only the Supabase **anon**
 > key belongs there; it is safe because row-level security constrains it.
@@ -59,24 +58,14 @@ undo the anonymity the rest of the design depends on. A province holds millions 
 people and cannot narrow to a person, which is why the line is drawn there and no
 finer.
 
-## Documentation
+## Project map
 
-| Document | What's in it |
-|----------|--------------|
-| [01 Requirements](docs/01-requirements.md) | Functional and non-functional requirements, scope, assumptions |
-| [02 Architecture](docs/02-architecture.md) | System design, technology rationale, request flows, failure handling |
-| [03 Data model](docs/03-data-model.md) | Tables, views, functions, row-level security |
-| [04 Datasets and methodology](docs/04-datasets-and-methodology.md) | Sources, emission factors, the calculation, limitations |
-| [05 Implementation plan](docs/05-implementation-plan.md) | Five sprints, task breakdown, risk register |
-| [06 Setup guide](docs/06-setup-guide.md) | Local setup, Supabase, data loading, deployment, conventions |
-| [07 API contracts](docs/07-api-contracts.md) | Every external and internal interface |
-| [08 Testing and acceptance](docs/08-testing-and-acceptance.md) | Test plan, acceptance criteria per requirement, demo script |
-| [09 Epics and traceability](docs/09-epics-and-traceability.md) | The team's epics and user stories mapped to requirements, tasks and code |
+See [COMPONENT-MAP.md](COMPONENT-MAP.md) for the routes and component tree.
+The Learn page (`/learn`) explains the calculation and its limitations.
 
 ## Repository layout
 
 ```
-docs/        specification and plan
 supabase/    migrations and seed SQL
 data/        human-editable reference CSVs
 public/geo/  vendored country boundaries for the world map
@@ -97,5 +86,4 @@ src/components/
 ## Attribution
 
 Geocoding and routing © OpenStreetMap contributors (Nominatim, OSRM).
-Emission factors and national emissions data are credited in full on the app's
-"How we calculate this" page and in [docs/04](docs/04-datasets-and-methodology.md).
+Emission factors and national emissions data are credited on the app's Learn page.

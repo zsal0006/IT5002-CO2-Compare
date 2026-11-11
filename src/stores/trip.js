@@ -18,8 +18,6 @@ export const useTripStore = defineStore('trip', () => {
 
   const distanceKm = ref(null)
   const approximate = ref(false)
-  const geometry = ref(null)
-  const durationMin = ref(null)
 
   const calculating = ref(false)
   const error = ref(null)
@@ -29,7 +27,6 @@ export const useTripStore = defineStore('trip', () => {
   // for the previous distance while the refetch is in flight.
   const serverModes = ref([])
   const serverKm = ref(null)
-  const usingServerCompare = ref(false)
 
   const logging = ref(false)
   const lastLog = ref(null)      // { modeKey, savedKg, emittedKg }
@@ -96,7 +93,6 @@ export const useTripStore = defineStore('trip', () => {
     const km = effectiveKm.value
     if (km == null) return
     if (!supabaseConfigured) {
-      usingServerCompare.value = false
       return
     }
     try {
@@ -115,19 +111,17 @@ export const useTripStore = defineStore('trip', () => {
         isBaseline: row.is_baseline
       }))
       serverKm.value = km
-      usingServerCompare.value = true
     } catch (err) {
       // Not surfaced as an error: the client fallback produces the same figures
       // from the same factors, so the user loses nothing visible.
       console.warn('[CO2 Compare] compare_journey unavailable, using client fallback:', err.message)
-      usingServerCompare.value = false
     }
   }
 
-  // A return-trip toggle changes the distance without re-routing, so the
-  // comparison has to be recomputed server-side too.
-  watch(effectiveKm, (km) => {
-    if (km != null && distanceKm.value != null) fetchComparison()
+  // calculate() refreshes after routing; only a return-trip toggle needs its
+  // own refresh because it changes the effective distance without re-routing.
+  watch(returnTrip, () => {
+    if (distanceKm.value != null) fetchComparison()
   })
 
   async function calculate() {
@@ -140,8 +134,6 @@ export const useTripStore = defineStore('trip', () => {
       const result = await routeDistance(origin.value, destination.value)
       distanceKm.value = result.km
       approximate.value = result.approximate
-      geometry.value = result.geometry
-      durationMin.value = result.durationMin
       await fetchComparison()
     } catch (err) {
       error.value = 'We could not work out the distance for that journey. Please try again.'
@@ -201,9 +193,6 @@ export const useTripStore = defineStore('trip', () => {
     distanceKm.value = null
     serverModes.value = []
     serverKm.value = null
-    usingServerCompare.value = false
-    geometry.value = null
-    durationMin.value = null
     approximate.value = false
     error.value = null
     lastLog.value = null
@@ -211,8 +200,8 @@ export const useTripStore = defineStore('trip', () => {
 
   return {
     origin, destination, returnTrip, carMode,
-    distanceKm, effectiveKm, approximate, geometry, durationMin,
-    calculating, error, logging, lastLog, sessionSavedKg, usingServerCompare,
+    distanceKm, effectiveKm, approximate,
+    calculating, error, logging, lastLog, sessionSavedKg,
     ready, comparison, allModes, best, worst, headlineSwap,
     calculate, logTrip, reset
   }

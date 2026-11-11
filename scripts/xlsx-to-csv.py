@@ -2,10 +2,9 @@
 
     python -I scripts/xlsx-to-csv.py <in.xlsx> <out.csv> [sheet-name]
 
-Replaces the "open it in Excel and save Sheet1 as CSV" step in docs/06 §6.4,
-which is the only reason that step was manual: the download is XLSX, our loader
-reads CSV, and the CKAN datastore for the resource is empty so there is no CSV
-to fetch.
+Converts the downloaded XLSX to CSV for the country-emissions preparation
+script. The CKAN datastore for the resource is empty, so there is no CSV to
+fetch directly.
 
 read_only=True matters here. The GIZ sheet is one row per country by roughly
 550 columns, and loading it in normal mode builds a cell object per cell;

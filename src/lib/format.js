@@ -24,11 +24,6 @@ export function formatKm(km) {
   return km < 10 ? `${nf(1).format(km)} km` : `${nf(0).format(km)} km`
 }
 
-export function formatPercent(pct) {
-  if (!Number.isFinite(pct)) return '—'
-  return `${nf(1).format(pct)}%`
-}
-
 const regionNames =
   typeof Intl.DisplayNames === 'function'
     ? new Intl.DisplayNames([LOCALE], { type: 'region' })

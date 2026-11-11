@@ -24,7 +24,7 @@ const props = defineProps({
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
 
 /** The modes a day card cycles through on tap, in order. */
-const CYCLE = ['car_average', 'train_national', 'bus_city', 'cycling']
+const CYCLE = ['car_average', 'cycling', 'walking', 'train_national', 'bus_city']
 
 const week = ref(['car_average', 'train_national', 'car_average', 'bus_city', 'car_average'])
 
@@ -32,8 +32,7 @@ const byKey = computed(() => Object.fromEntries(props.modes.map((m) => [m.modeKe
 
 /** Only offer modes this journey actually has factors for. */
 const cycleAvailable = computed(() => {
-  const list = CYCLE.filter((k) => byKey.value[k])
-  return list.length ? list : props.modes.slice(0, 4).map((m) => m.modeKey)
+  return CYCLE.filter((k) => byKey.value[k])
 })
 
 // A journey whose factors change (the car sub-type, say) must not leave the
@@ -96,17 +95,18 @@ const int = (n) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }
 
 function cycleDay(index) {
   const list = cycleAvailable.value
+  if (!list.length) return
   const current = week.value[index]
   const next = list[(list.indexOf(current) + 1) % list.length]
   week.value = week.value.map((k, i) => (i === index ? next : k))
 }
 
 function preset(name) {
-  const [car, train, bus, bike] = CYCLE
+  const [car, bike, walking, train, bus] = CYCLE
   const pick = (k) => (byKey.value[k] ? k : cycleAvailable.value[0])
   if (name === 'car') week.value = DAYS.map(() => pick(car))
   if (name === 'mix') week.value = [car, train, car, train, car].map(pick)
-  if (name === 'green') week.value = [train, bike, train, bus, train].map(pick)
+  if (name === 'green') week.value = [train, bike, walking, bus, train].map(pick)
 }
 </script>
 
