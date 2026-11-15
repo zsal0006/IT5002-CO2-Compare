@@ -1,0 +1,7 @@
+project_id = "co2-compare"
+
+[functions.address-search]
+verify_jwt = true
+
+[functions.route-distance]
+verify_jwt = true

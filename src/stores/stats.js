@@ -13,15 +13,17 @@ export const useStatsStore = defineStore('stats', () => {
   const byRegionMode = ref([])    // [{ country_code, region_name, mode_key, ... }]
   const loading = ref(false)
   const error = ref(null)
+  const warning = ref(null)
 
   async function load({ force = false } = {}) {
-    if (!force && global.value) return
+    if (!force && global.value && !warning.value) return
     if (!supabaseConfigured) {
       error.value = 'The shared database is not configured, so community totals are unavailable.'
       return
     }
     loading.value = true
     error.value = null
+    warning.value = null
     try {
       const [g, r, m, rm] = await Promise.all([
         supabase.from('v_savings_global').select('*').single(),
@@ -30,15 +32,17 @@ export const useStatsStore = defineStore('stats', () => {
         supabase.from('v_savings_by_region_mode').select('*').order('total_saved_kg', { ascending: false })
       ])
       if (g.error) throw g.error
+      if (r.error) throw r.error
+      if (m.error) throw m.error
       global.value = g.data
       byRegion.value = r.data ?? []
       byMode.value = m.data ?? []
       // Added by migration 0004. A project that has not applied it yet still
-      // gets a working global view rather than a failed page, so this one error
-      // is swallowed where the others are not.
+      // gets a working global view rather than a failed page.
       if (rm.error) {
         console.warn('[CO2 Compare] v_savings_by_region_mode unavailable:', rm.error.message)
         byRegionMode.value = []
+        warning.value = 'Regional travel-mode totals are unavailable; regional details cannot be displayed.'
       } else {
         byRegionMode.value = rm.data ?? []
       }
@@ -58,7 +62,7 @@ export const useStatsStore = defineStore('stats', () => {
   }
 
   return {
-    global, byRegion, byMode, byRegionMode, loading, error,
+    global, byRegion, byMode, byRegionMode, loading, error, warning,
     load, modesInRegion
   }
 })

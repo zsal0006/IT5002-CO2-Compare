@@ -1,6 +1,11 @@
 <script setup>
 import { ref, watch, computed, onBeforeUnmount } from 'vue'
-import { geocode, shortLabel, currentLocation, SupersededError } from '@/lib/geocode'
+import {
+  geocode,
+  shortLabel,
+  currentLocation
+} from '@/lib/geocode'
+import AddressAttribution from '@/components/compare/AddressAttribution.vue'
 
 /**
  * One row of the journey box (E1.1, E1.2).
@@ -30,13 +35,7 @@ const props = defineProps({
   /** The rail's end-cap for this row: an outlined dot, or a filled square. */
   marker: { type: String, default: 'dot' }, // 'dot' | 'square'
   /** E1.2 — offered on the start field only. */
-  allowCurrentLocation: { type: Boolean, default: false },
-  /**
-   * Prefer results near this place and in its country. Set on the end field
-   * from the confirmed start location, so a commute's destination ranks above
-   * a same-named place on another continent.
-   */
-  bias: { type: Object, default: null }
+  allowCurrentLocation: { type: Boolean, default: false }
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -77,46 +76,32 @@ const open = computed(
 
 watch(query, (value) => {
   clearTimeout(debounceTimer)
+  cancelInFlight()
+  candidates.value = []
   message.value = ''
   active.value = -1
   if (props.modelValue) emit('update:modelValue', null)
 
   if (value.trim().length < MIN_CHARS) {
-    cancelInFlight()
-    candidates.value = []
     return
   }
   debounceTimer = setTimeout(() => search(value), DEBOUNCE_MS)
 })
 
-// If the start location is confirmed after the end has already been typed, the
-// candidates on screen were ranked without it. Re-rank rather than making the
-// user retype.
-watch(
-  () => props.bias?.countryCode,
-  (code) => {
-    if (code && !props.modelValue && query.value.trim().length >= MIN_CHARS) {
-      search(query.value)
-    }
-  }
-)
-
 function cancelInFlight() {
   controller?.abort()
   controller = null
+  searching.value = false
 }
 
 async function search(value) {
-  // Supersede anything still queued. Without this, each pause while typing adds
-  // a request that the rate limiter holds for another second, and the answer to
-  // what you actually typed arrives several seconds late.
   cancelInFlight()
   controller = new AbortController()
   const signal = controller.signal
 
   searching.value = true
   try {
-    const places = await geocode(value, { signal, bias: props.bias })
+    const places = await geocode(value, { signal })
     if (signal.aborted) return // a newer query has taken over
     candidates.value = places
     active.value = places.length ? 0 : -1
@@ -124,8 +109,8 @@ async function search(value) {
       message.value = "We couldn't find that place. Try adding a city or country."
     }
   } catch (err) {
-    if (err instanceof SupersededError || err.name === 'AbortError') return
-    message.value = 'Location search is unavailable right now. Please try again.'
+    if (signal.aborted || err.name === 'AbortError') return
+    message.value = `Location search failed: ${err.message || 'Please try again.'}`
   } finally {
     if (!signal.aborted) searching.value = false
   }
@@ -134,7 +119,7 @@ async function search(value) {
 /** Enter searches straight away rather than waiting out the debounce. */
 function onEnter() {
   if (candidates.value.length && active.value >= 0) {
-    choose(candidates.value[active.value])
+    selectPlace(candidates.value[active.value])
     return
   }
   clearTimeout(debounceTimer)
@@ -147,7 +132,7 @@ function move(delta) {
   active.value = (active.value + delta + n) % n
 }
 
-function choose(place) {
+function selectPlace(place) {
   cancelInFlight()
   clearTimeout(debounceTimer)
   emit('update:modelValue', place)
@@ -158,6 +143,7 @@ function choose(place) {
 }
 
 function clear() {
+  cancelInFlight()
   emit('update:modelValue', null)
   query.value = ''
 }
@@ -169,7 +155,7 @@ async function useCurrentLocation() {
   locating.value = true
   message.value = ''
   try {
-    choose(await currentLocation())
+    selectPlace(await currentLocation())
   } catch (err) {
     message.value = err.message
     focused.value = true
@@ -203,7 +189,12 @@ onBeforeUnmount(() => {
          it is a resolved coordinate now, and editing the words would not
          change it. Clearing starts a fresh search. -->
     <template v-if="modelValue">
-      <span :id="fieldId" class="chosen" tabindex="-1">{{ shortLabel(modelValue) }}</span>
+      <span class="chosen-wrap">
+        <span :id="fieldId" class="chosen" tabindex="-1">{{ shortLabel(modelValue) }}</span>
+        <small v-if="modelValue.attribution" class="location-credit">
+          <AddressAttribution :places="[modelValue]" />
+        </small>
+      </span>
       <button
         type="button"
         class="icon-btn"
@@ -263,20 +254,23 @@ onBeforeUnmount(() => {
         <li
           v-for="(c, i) in candidates"
           :id="`${listId}-${i}`"
-          :key="`${c.lat},${c.lon}`"
+          :key="`${c.label}-${c.lat}-${c.lon}`"
           role="option"
           :aria-selected="i === active"
         >
           <button
             type="button"
             :class="{ active: i === active }"
-            @click="choose(c)"
+            @click="selectPlace(c)"
             @mouseenter="active = i"
           >
             {{ c.label }}
           </button>
         </li>
       </ul>
+      <small v-if="candidates.length" class="location-credit panel-credit">
+        <AddressAttribution :places="candidates" />
+      </small>
     </div>
 
     <p class="visually-hidden" aria-live="polite">{{ status }}</p>
@@ -293,7 +287,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  height: 56px;
+  min-height: 56px;
   padding-left: 0.875rem;
   padding-right: 0.375rem;
 }
@@ -323,7 +317,6 @@ onBeforeUnmount(() => {
 .row:focus-within .marker.dot { border-color: var(--accent); }
 
 .chosen {
-  flex: 1;
   min-width: 0;
   font-size: 0.9375rem;
   overflow: hidden;
@@ -331,6 +324,9 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 .chosen:focus { outline: none; }
+.chosen-wrap { flex: 1; min-width: 0; display: grid; gap: 0.125rem; }
+.location-credit { color: var(--text-secondary); font-size: 0.6875rem; line-height: 1.2; }
+.panel-credit { display: block; padding: 0.375rem; }
 
 .icon-btn {
   flex: none;

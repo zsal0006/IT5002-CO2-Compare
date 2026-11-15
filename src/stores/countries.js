@@ -16,14 +16,25 @@ export const useCountriesStore = defineStore('countries', () => {
   const loadingSnapshot = ref(false)
   const error = ref(null)
 
+  async function loadData(loading, message, fetchData) {
+    loading.value = true
+    try {
+      return await fetchData()
+    } catch (err) {
+      error.value = `${message}: ${err.message}`
+      return []
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function loadList() {
     if (list.value.length || loadingList.value) return
     if (!supabaseConfigured) {
       error.value = 'The shared database is not configured, so country data is unavailable.'
       return
     }
-    loadingList.value = true
-    try {
+    await loadData(loadingList, 'Could not load the country list', async () => {
       // v_countries (migration 0004) is already one row per country. Selecting
       // from the base table instead would pull every country-year — about
       // 12,200 rows — to fill a dropdown, and would be cut short by any row
@@ -34,28 +45,18 @@ export const useCountriesStore = defineStore('countries', () => {
         .order('country_name')
       if (err) throw err
       list.value = data ?? []
-    } catch (err) {
-      error.value = `Could not load the country list: ${err.message}`
-    } finally {
-      loadingList.value = false
-    }
+    })
   }
 
   async function loadSeries(code) {
     if (!code || series.value[code]) return series.value[code]
     if (!supabaseConfigured) return []
-    loadingSeries.value = true
-    try {
+    return loadData(loadingSeries, `Could not load emissions for ${code}`, async () => {
       const { data, error: err } = await supabase.rpc('country_series', { p_country_code: code })
       if (err) throw err
       series.value = { ...series.value, [code]: data ?? [] }
       return data ?? []
-    } catch (err) {
-      error.value = `Could not load emissions for ${code}: ${err.message}`
-      return []
-    } finally {
-      loadingSeries.value = false
-    }
+    })
   }
 
   /**
@@ -67,8 +68,7 @@ export const useCountriesStore = defineStore('countries', () => {
     if (snapshot.value.length && (year == null || year === snapshotYear.value)) {
       return snapshot.value
     }
-    loadingSnapshot.value = true
-    try {
+    return loadData(loadingSnapshot, 'Could not load the world map data', async () => {
       let target = year
       if (target == null) {
         const { data: maxRow, error: maxErr } = await supabase
@@ -91,12 +91,7 @@ export const useCountriesStore = defineStore('countries', () => {
       snapshot.value = data ?? []
       snapshotYear.value = target
       return snapshot.value
-    } catch (err) {
-      error.value = `Could not load the world map data: ${err.message}`
-      return []
-    } finally {
-      loadingSnapshot.value = false
-    }
+    })
   }
 
   return {

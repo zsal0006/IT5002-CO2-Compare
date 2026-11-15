@@ -1,9 +1,9 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import EmissionsTrend from '@/components/EmissionsTrend.vue'
-import DecadeBars from '@/components/DecadeBars.vue'
-import WorldEmissionsMap from '@/components/WorldEmissionsMap.vue'
+import EmissionsTrend from '@/components/dashboard/EmissionsTrend.vue'
+import DecadeBars from '@/components/dashboard/DecadeBars.vue'
+import WorldEmissionsMap from '@/components/dashboard/WorldEmissionsMap.vue'
 import { useCountriesStore } from '@/stores/countries'
 import { formatNumber } from '@/lib/format'
 import { DEFAULT_COUNTRY_A3 } from '@/lib/locale'

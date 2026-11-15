@@ -1,18 +1,13 @@
 <script setup>
 import { computed } from 'vue'
-import SegmentedControl from '@/components/SegmentedControl.vue'
+import SegmentedControl from '@/components/shared/SegmentedControl.vue'
 import { milestoneFor, plural } from '@/lib/community'
-import { treeDaysFor, litresFor } from '@/lib/benefits'
 import { formatCo2, formatNumber, countryName } from '@/lib/format'
 
 /**
  * The community total, global or for one region.
  *
- * The equivalences underneath come from kilometres actually logged, not from
- * scaling the kilogram figure — `v_savings_by_mode` carries distance, so
- * "petrol left in the ground" is the fuel a car would have burned over the
- * car-free kilometres people really travelled. Scaling litres out of a saving
- * would be a number about a number.
+ * The trip total and car-free distance stay in their measured units.
  */
 const props = defineProps({
   scope: { type: String, required: true }, // 'global' | 'region'
@@ -22,7 +17,8 @@ const props = defineProps({
   /** { trips, savedKg, carFreeTrips, carFreeKm } for the current scope. */
   summary: { type: Object, required: true },
   /** Distinct countries taking part, globally. */
-  countries: { type: Number, default: 0 }
+  countries: { type: Number, default: 0 },
+  regionAvailable: { type: Boolean, default: true }
 })
 const emit = defineEmits(['update:scope', 'update:regionKey'])
 
@@ -54,8 +50,8 @@ const headline = computed(() => {
   if (savedKg.value <= 0) {
     return {
       pre: props.scope === 'global'
-        ? 'No CO₂ avoided yet'
-        : `No CO₂ avoided in ${placeName.value} yet`,
+        ? 'No CO₂e avoided yet'
+        : `No CO₂e avoided in ${placeName.value} yet`,
       figure: '',
       post: ''
     }
@@ -82,30 +78,7 @@ const chips = computed(() => {
   return out
 })
 
-const equivalents = computed(() => {
-  const days = treeDaysFor(savedKg.value)
-  const km = props.summary.carFreeKm ?? 0
-  return [
-    {
-      key: 'tree',
-      tone: 'accent',
-      value: days >= 365 ? `${(days / 365).toFixed(1)} tree-years` : plural(days, 'tree-day'),
-      label: "of a mature tree's work"
-    },
-    {
-      key: 'fuel',
-      tone: 'neutral',
-      value: `${formatNumber(litresFor(km), km < 100 ? 1 : 0)} litres`,
-      label: 'of petrol left in the ground'
-    },
-    {
-      key: 'km',
-      tone: 'series-1',
-      value: `${formatNumber(km, km < 100 ? 1 : 0)} km`,
-      label: 'travelled without a car'
-    }
-  ]
-})
+const carFreeKm = computed(() => props.summary.carFreeKm ?? 0)
 
 const milestone = computed(() => milestoneFor(savedKg.value))
 
@@ -128,7 +101,7 @@ const milestoneText = computed(() => {
   <section class="hero" aria-labelledby="impact-heading">
     <div class="controls">
       <SegmentedControl
-        :options="SCOPES"
+        :options="regionAvailable ? SCOPES : SCOPES.slice(0, 1)"
         :model-value="scope"
         tone="ink"
         aria-label="Scope"
@@ -162,26 +135,14 @@ const milestoneText = computed(() => {
       </div>
     </div>
 
-    <div class="equivalents">
-      <div v-for="e in equivalents" :key="e.key" class="eq" :class="e.tone">
-        <span class="eq-icon" aria-hidden="true">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path v-if="e.key === 'tree'" d="M12 22v-6M12 16c4 0 7-2.5 7-6.5S16 2 12 2 5 5.5 5 9.5 8 16 12 16z" />
-            <path v-else-if="e.key === 'fuel'" d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M6 9h6M14 8l3 3v6a1.5 1.5 0 0 0 3 0v-7l-3-3" />
-            <path v-else d="M5 15l1.6-5.2A2 2 0 0 1 8.5 8.4h7a2 2 0 0 1 1.9 1.4L19 15M4 15h16v3H4zM7 18v2M17 18v2" />
-          </svg>
-        </span>
-        <span>
-          <span class="eq-value">{{ e.value }}</span>
-          <span class="eq-label">{{ e.label }}</span>
-        </span>
-      </div>
+    <div class="equivalent">
+      <strong>{{ formatNumber(carFreeKm, carFreeKm < 100 ? 1 : 0) }} km</strong>
+      <span>travelled without a car</span>
     </div>
 
     <div class="milestone">
       <div class="milestone-head">
-        <span>Next milestone: <strong>{{ milestone.next }} kg</strong></span>
+        <span>Next milestone: <strong>{{ milestone.next }} kg CO₂e</strong></span>
         <span class="milestone-detail">{{ milestoneText }}</span>
       </div>
       <div
@@ -254,32 +215,18 @@ const milestoneText = computed(() => {
 }
 .chip strong { color: var(--on-ink); font-weight: 700; }
 
-.equivalents { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; }
-
-.eq {
+.equivalent {
   background: var(--ink-2);
   border: 1px solid var(--ink-border);
   border-radius: var(--radius-lg);
   padding: 1rem;
   display: flex;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
   align-items: center;
 }
-.eq-icon {
-  width: 40px;
-  height: 40px;
-  flex: none;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.accent .eq-icon { background: #13301f; color: var(--on-ink-accent); }
-.neutral .eq-icon { background: var(--ink-border); color: var(--on-ink-2); }
-.series-1 .eq-icon { background: #172554; color: var(--on-ink-series-1); }
-
-.eq-value { display: block; font-family: var(--font-display); font-size: 1.375rem; font-weight: 600; }
-.eq-label { font-size: 0.75rem; color: var(--on-ink-3); }
+.equivalent strong { font-family: var(--font-display); font-size: 1.375rem; }
+.equivalent span { color: var(--on-ink-3); font-size: 0.8125rem; }
 
 .milestone { display: flex; flex-direction: column; gap: 0.5rem; }
 .milestone-head {

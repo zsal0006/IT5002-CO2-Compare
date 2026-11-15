@@ -1,21 +1,22 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import ImpactHero from '@/components/ImpactHero.vue'
-import ModeMix from '@/components/ModeMix.vue'
-import RegionBoard from '@/components/RegionBoard.vue'
+import ImpactHero from '@/components/impact/ImpactHero.vue'
+import ModeMix from '@/components/impact/ModeMix.vue'
+import RegionBoard from '@/components/impact/RegionBoard.vue'
 import { useStatsStore } from '@/stores/stats'
 import { useTripStore } from '@/stores/trip'
 import { summariseModes, plural } from '@/lib/community'
 import { formatCo2, countryName } from '@/lib/format'
+import { MODE_KEYS } from '@/lib/emissions'
 
 /**
  * E4 — what everyone has avoided together, globally or in one region.
  *
  * Every figure here comes from a database view. The client never touches
  * `trip_logs`, which has RLS with no policy: the aggregates are public, the
- * rows behind them are not. That is the whole privacy design, and it is also
- * what stops the leaderboard being forged by anyone holding the anon key.
+ * rows behind them are not. Submitted trips are self-reported and can be
+ * repeated, even though direct access to the underlying rows is restricted.
  */
 const stats = useStatsStore()
 const trip = useTripStore()
@@ -38,6 +39,9 @@ watch(
   },
   { immediate: true }
 )
+watch(() => stats.warning, (warning) => {
+  if (warning) scope.value = 'global'
+})
 
 const selectedRegion = computed(
   () => stats.byRegion.find((r) => keyOf(r) === regionKey.value) ?? null
@@ -45,9 +49,12 @@ const selectedRegion = computed(
 
 /** The mode rows for whichever scope is showing. */
 const modeRows = computed(() => {
-  if (scope.value === 'global') return stats.byMode
-  const r = selectedRegion.value
-  return r ? stats.modesInRegion(r.country_code, r.region_name) : []
+  const rows = scope.value === 'global'
+    ? stats.byMode
+    : selectedRegion.value
+      ? stats.modesInRegion(selectedRegion.value.country_code, selectedRegion.value.region_name)
+      : []
+  return rows.filter((row) => MODE_KEYS.includes(row.mode_key))
 })
 
 /**
@@ -111,7 +118,7 @@ function focusRegion(key) {
       <div>
         <h1>Community impact</h1>
         <p>
-          Every logged trip adds the CO₂ it avoided versus driving to a regional and a
+          Every logged trip adds the CO₂e it avoided versus driving to a regional and a
           global total.
         </p>
       </div>
@@ -121,7 +128,7 @@ function focusRegion(key) {
           <rect x="5" y="11" width="14" height="10" rx="2" />
           <path d="M8 11V7a4 4 0 0 1 8 0v4" />
         </svg>
-        Anonymous: a trip is only a distance, a mode and a region
+        Trip logs include distance, mode, region and timestamp, but not addresses
       </p>
     </header>
 
@@ -129,12 +136,14 @@ function focusRegion(key) {
     <p v-else-if="stats.loading && !stats.global" class="muted">Loading community totals…</p>
 
     <template v-else-if="stats.global">
+      <p v-if="stats.warning" class="notice">{{ stats.warning }}</p>
       <ImpactHero
         :scope="scope"
         :region-key="regionKey"
         :regions="stats.byRegion"
         :summary="summary"
         :countries="Number(stats.global.countries) || 0"
+        :region-available="!stats.warning"
         @update:scope="scope = $event"
         @update:region-key="regionKey = $event"
       />
@@ -180,6 +189,7 @@ function focusRegion(key) {
         <RegionBoard
           :regions="stats.byRegion"
           :selected="scope === 'region' ? regionKey : null"
+          :selectable="!stats.warning"
           @select="focusRegion"
         />
       </div>

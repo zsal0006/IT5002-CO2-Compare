@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import SegmentedControl from '@/components/SegmentedControl.vue'
+import SegmentedControl from '@/components/shared/SegmentedControl.vue'
 import { areaPath, percentChange, signedPercent, usableRows } from '@/lib/series'
 import { formatNumber } from '@/lib/format'
 

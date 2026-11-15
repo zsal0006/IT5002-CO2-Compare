@@ -1,23 +1,23 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { routeDistance } from '@/lib/routing'
-import { compare, HEADLINE_MODES } from '@/lib/emissions'
+import { compare, MODE_KEYS, MODE_LABELS } from '@/lib/emissions'
 import { useFactorsStore } from '@/stores/factors'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
 
 /**
  * The current journey: the two confirmed places, the distance, the comparison,
- * and the logging action. Holds no PII — only places the user typed themselves,
- * and never persisted beyond the tab.
+ * and the logging action. The app keeps places in tab memory; routing sends
+ * their coordinates to a provider.
  */
 export const useTripStore = defineStore('trip', () => {
   const origin = ref(null)       // Place | null
   const destination = ref(null)  // Place | null
   const returnTrip = ref(false)
-  const carMode = ref('car_average')
 
   const distanceKm = ref(null)
   const approximate = ref(false)
+  const routeAttribution = ref(null)
 
   const calculating = ref(false)
   const error = ref(null)
@@ -29,7 +29,7 @@ export const useTripStore = defineStore('trip', () => {
   const serverKm = ref(null)
 
   const logging = ref(false)
-  const lastLog = ref(null)      // { modeKey, savedKg, emittedKg }
+  const lastLog = ref(null)
   const sessionSavedKg = ref(0)  // session only; cleared when the tab closes
 
   const ready = computed(() => Boolean(origin.value && destination.value))
@@ -37,11 +37,6 @@ export const useTripStore = defineStore('trip', () => {
   /** Distance actually used in the calculation, doubled for a return trip. */
   const effectiveKm = computed(() =>
     distanceKm.value == null ? null : distanceKm.value * (returnTrip.value ? 2 : 1)
-  )
-
-  /** The five headline modes, with the chosen car sub-type swapped in (FR-6). */
-  const headlineKeys = computed(() =>
-    HEADLINE_MODES.map((k) => (k === 'car_average' ? carMode.value : k))
   )
 
   /**
@@ -55,38 +50,19 @@ export const useTripStore = defineStore('trip', () => {
    */
   const allModes = computed(() => {
     if (effectiveKm.value == null) return []
-    if (serverModes.value.length && serverKm.value === effectiveKm.value) {
+    if (serverModes.value.length === MODE_KEYS.length && serverKm.value === effectiveKm.value) {
       return serverModes.value
     }
     const factorsStore = useFactorsStore()
     return compare(effectiveKm.value, factorsStore.factors)
   })
 
-  /** The five headline modes, with the chosen car sub-type swapped in. */
+  /** The five supported modes, including the car baseline. */
   const comparison = computed(() =>
-    headlineKeys.value
+    MODE_KEYS
       .map((key) => allModes.value.find((m) => m.modeKey === key))
       .filter(Boolean)
-      .sort((a, b) => a.kg - b.kg || a.label.localeCompare(b.label))
   )
-
-  const worst = computed(() => comparison.value.at(-1) ?? null)
-  const best = computed(() => comparison.value[0] ?? null)
-
-  /**
-   * The headline swap for this journey (E2.2): the biggest saving available
-   * that is not simply "walk instead". We take the cleanest *powered* mode so
-   * the message stays actionable for a 40 km commute; if none exists, fall back
-   * to the cleanest mode overall.
-   */
-  const headlineSwap = computed(() => {
-    const from = comparison.value.find((m) => m.isBaseline) ?? worst.value
-    if (!from) return null
-    const powered = comparison.value.filter((m) => m.category !== 'active' && m.kg < from.kg)
-    const to = powered[0] ?? best.value
-    if (!to || to.modeKey === from.modeKey) return null
-    return { from, to, savedKg: from.kg - to.kg }
-  })
 
   /** Ask the database to do the multiplication (the brief's business logic). */
   async function fetchComparison() {
@@ -101,9 +77,10 @@ export const useTripStore = defineStore('trip', () => {
       })
       if (rpcError) throw rpcError
 
+      if (effectiveKm.value !== km) return
       serverModes.value = (data ?? []).map((row) => ({
         modeKey: row.mode_key,
-        label: row.mode_label,
+        label: MODE_LABELS[row.mode_key] ?? row.mode_label,
         category: row.category,
         factor: Number(row.factor_g_per_pkm),
         kg: Number(row.kg),
@@ -112,8 +89,7 @@ export const useTripStore = defineStore('trip', () => {
       }))
       serverKm.value = km
     } catch (err) {
-      // Not surfaced as an error: the client fallback produces the same figures
-      // from the same factors, so the user loses nothing visible.
+      // The client uses its loaded factors when the server comparison fails.
       console.warn('[CO2 Compare] compare_journey unavailable, using client fallback:', err.message)
     }
   }
@@ -124,19 +100,38 @@ export const useTripStore = defineStore('trip', () => {
     if (distanceKm.value != null) fetchComparison()
   })
 
+  watch([origin, destination], () => {
+    distanceKm.value = null
+    approximate.value = false
+    routeAttribution.value = null
+    serverModes.value = []
+    serverKm.value = null
+    lastLog.value = null
+    error.value = null
+  })
+
   async function calculate() {
-    if (!ready.value) return
+    if (!ready.value || calculating.value) return
     calculating.value = true
     error.value = null
     lastLog.value = null
+    const from = origin.value
+    const to = destination.value
 
     try {
-      const result = await routeDistance(origin.value, destination.value)
+      const result = await routeDistance(from, to)
+      if (origin.value !== from || destination.value !== to) return
+      if (!Number.isFinite(result.km) || result.km <= 0) {
+        throw new Error('The journey distance must be greater than zero.')
+      }
       distanceKm.value = result.km
       approximate.value = result.approximate
+      routeAttribution.value = result.attribution
       await fetchComparison()
     } catch (err) {
-      error.value = 'We could not work out the distance for that journey. Please try again.'
+      if (origin.value !== from || destination.value !== to) return
+      console.warn('[CO2 Compare] Could not calculate journey:', err.message)
+      error.value = `Could not calculate the journey: ${err.message || 'Please try again.'}`
       distanceKm.value = null
     } finally {
       calculating.value = false
@@ -145,7 +140,7 @@ export const useTripStore = defineStore('trip', () => {
 
   /**
    * Log the mode the user actually took. The saving is recomputed in the
-   * database (FR-11) — we send only distance, mode and country.
+   * database (FR-11) — we send distance, mode, country and region.
    */
   async function logTrip(modeKey) {
     if (effectiveKm.value == null || logging.value) return null
@@ -171,11 +166,7 @@ export const useTripStore = defineStore('trip', () => {
 
       lastLog.value = {
         modeKey,
-        savedKg: Number(data.saved_kg),
-        emittedKg: Number(data.emitted_kg),
-        countryCode: data.country_code,
-        regionName: data.region_name,
-        regionTotalKg: data.region_total_kg == null ? null : Number(data.region_total_kg)
+        savedKg: Number(data.saved_kg)
       }
       sessionSavedKg.value += Number(data.saved_kg)
       return lastLog.value
@@ -187,22 +178,11 @@ export const useTripStore = defineStore('trip', () => {
     }
   }
 
-  function reset() {
-    origin.value = null
-    destination.value = null
-    distanceKm.value = null
-    serverModes.value = []
-    serverKm.value = null
-    approximate.value = false
-    error.value = null
-    lastLog.value = null
-  }
-
   return {
-    origin, destination, returnTrip, carMode,
-    distanceKm, effectiveKm, approximate,
+    origin, destination, returnTrip,
+    distanceKm, effectiveKm, approximate, routeAttribution,
     calculating, error, logging, lastLog, sessionSavedKg,
-    ready, comparison, allModes, best, worst, headlineSwap,
-    calculate, logTrip, reset
+    ready, comparison,
+    calculate, logTrip
   }
 })

@@ -2,11 +2,11 @@
  * ISO 3166-1 alpha-3 -> alpha-2.
  *
  * The GIZ country dataset keys on alpha-3; trip logs key on alpha-2 (that is
- * what Nominatim returns). Truncating "AUT" to "AU" would silently credit
+ * used for trip logging). Truncating "AUT" to "AU" would silently credit
  * Austria's savings to Australia, so the mapping is explicit.
  *
  * Used by the emissions-data preparation script to match alpha-3 dataset codes
- * to the alpha-2 codes returned by Nominatim.
+ * to the alpha-2 codes used for trip logging.
  */
 const ISO3_TO_ISO2 = {
   ABW: 'AW', AFG: 'AF', AGO: 'AO', AIA: 'AI', ALA: 'AX', ALB: 'AL', AND: 'AD',

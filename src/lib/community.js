@@ -15,20 +15,11 @@ export const MILESTONES = [
   1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000
 ]
 
-/**
- * Modes that are not car-free despite not being a car.
- *
- * `category` almost carries this on its own, but `other` holds the e-scooter
- * and the ferry, which ARE car-free, alongside the motorbike, which is not in
- * any sense a reader would accept — the legend says "by car or motorbike".
- * One named exception is more honest than bending the category.
- */
-const MOTORISED_PRIVATE = new Set(['motorbike'])
 
 /** Did this mode leave the car at home? */
 export function isCarFree(row) {
   if (!row) return false
-  return row.category !== 'car' && !MOTORISED_PRIVATE.has(row.mode_key)
+  return row.category !== 'car'
 }
 
 /**

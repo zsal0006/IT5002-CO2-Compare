@@ -1,17 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 /**
  * True when the app has credentials to talk to Supabase. When false the app
  * still runs: the calculator uses the bundled fallback factors and the
  * dashboard shows an explicit "not configured" state (NFR-7).
  */
-export const supabaseConfigured = Boolean(url && key)
+export const supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
 
 export const supabase = supabaseConfigured
-  ? createClient(url, key, { auth: { persistSession: false } })
+  ? createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } })
   : null
 
 if (!supabaseConfigured) {

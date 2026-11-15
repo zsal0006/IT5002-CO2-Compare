@@ -39,7 +39,7 @@ const { sessionSavedKg } = storeToRefs(trip)
             <path d="M5 19c0-8 6-13 15-14 0 9-5 15-12 15-2 0-3-1-3-1zM5 19l7-7" />
           </svg>
           <span class="visually-hidden">Saved this session:</span>
-          {{ formatCo2(sessionSavedKg) }} saved
+          {{ formatCo2(sessionSavedKg) }} CO₂e avoided
         </span>
       </nav>
     </div>
@@ -54,8 +54,8 @@ const { sessionSavedKg } = storeToRefs(trip)
       <span>CO₂ Compare · IT5002 coursework project</span>
       <span>
         Emission factors credited on
-        <RouterLink to="/learn">how we calculate this</RouterLink>. Geocoding and routing
-        © OpenStreetMap contributors; boundaries from Natural Earth.
+        <RouterLink to="/learn">how we calculate this</RouterLink>. Address search by
+        Geoapify; routing by OpenRouteService; boundaries from Natural Earth.
       </span>
     </div>
   </footer>

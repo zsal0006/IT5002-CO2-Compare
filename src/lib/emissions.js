@@ -39,6 +39,16 @@ export function emissionsKg(distanceKm, factorGPerPkm) {
   return (distanceKm * factorGPerPkm) / 1000
 }
 
+/** Equivalent distance in a baseline vehicle for the same emissions. */
+export function carEquivalentKm(distanceKm, factorGPerPkm, carFactorGPerPkm) {
+  if (
+    !Number.isFinite(distanceKm) || distanceKm < 0 ||
+    !Number.isFinite(factorGPerPkm) || factorGPerPkm < 0 ||
+    !Number.isFinite(carFactorGPerPkm) || carFactorGPerPkm <= 0
+  ) return 0
+  return (distanceKm * factorGPerPkm) / carFactorGPerPkm
+}
+
 /**
  * Saving versus the baseline mode. Clamped at zero: the leaderboard counts
  * avoided emissions, not a net ledger.
@@ -47,28 +57,33 @@ export function savedKg(distanceKm, factorGPerPkm, baselineGPerPkm) {
   return Math.max(0, emissionsKg(distanceKm, baselineGPerPkm) - emissionsKg(distanceKm, factorGPerPkm))
 }
 
+/** The five modes supported by the app, in display order. */
+export const MODE_KEYS = ['cycling', 'walking', 'bus_city', 'train_national', 'car_average']
+export const MODE_LABELS = {
+  cycling: 'Cycling',
+  walking: 'Walking',
+  bus_city: 'Bus',
+  train_national: 'Train',
+  car_average: 'Car'
+}
+
 /**
  * Build the full comparison for a journey, sorted cleanest-first.
  *
  * @param {number} distanceKm
  * @param {Factor[]} factors
- * @param {{modeKeys?: string[]}} [options] restrict to a subset of modes
  * @returns {ModeResult[]}
  */
-export function compare(distanceKm, factors, options = {}) {
+export function compare(distanceKm, factors) {
   const baseline = factors.find((f) => f.is_baseline)
   const baselineFactor = baseline ? Number(baseline.factor_g_per_pkm) : 0
 
-  const pool = options.modeKeys
-    ? options.modeKeys.map((k) => factors.find((f) => f.mode_key === k)).filter(Boolean)
-    : factors
-
-  return pool
+  return factors
     .map((f) => {
       const factor = Number(f.factor_g_per_pkm)
       return {
         modeKey: f.mode_key,
-        label: f.mode_label,
+        label: MODE_LABELS[f.mode_key] ?? f.mode_label,
         category: f.category,
         factor,
         kg: emissionsKg(distanceKm, factor),
@@ -78,9 +93,3 @@ export function compare(distanceKm, factors, options = {}) {
     })
     .sort((a, b) => a.kg - b.kg || a.label.localeCompare(b.label))
 }
-
-/** The four alternatives shown to users, in the intended display order. */
-export const ALTERNATIVE_MODE_KEYS = ['cycling', 'walking', 'train_national', 'bus_city']
-
-/** The alternatives plus the car reference used to calculate savings (FR-4). */
-export const HEADLINE_MODES = ['car_average', ...ALTERNATIVE_MODE_KEYS]

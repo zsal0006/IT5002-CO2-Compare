@@ -1,12 +1,13 @@
 <script setup>
 import { computed, ref } from 'vue'
-import SegmentedControl from '@/components/SegmentedControl.vue'
+import SegmentedControl from '@/components/shared/SegmentedControl.vue'
 import { iconFor } from '@/lib/modeIcons'
 import { isCarFree, plural } from '@/lib/community'
 import { formatCo2 } from '@/lib/format'
+import { MODE_LABELS } from '@/lib/emissions'
 
 /**
- * How people travel: the mode split, by CO₂ avoided or by number of trips.
+ * How people travel: the mode split, by CO₂e avoided or by number of trips.
  *
  * Those two measures rank differently on purpose, and the toggle is the point —
  * a mode chosen rarely for long journeys out-saves one chosen often for short
@@ -48,7 +49,7 @@ const ranked = computed(() => {
   const max = Math.max(...list.map(valueOf), 0.0001)
   return list.map((r) => ({
     key: r.mode_key,
-    name: r.mode_label,
+    name: MODE_LABELS[r.mode_key] ?? r.mode_label,
     icon: iconFor(r.mode_key),
     carFree: isCarFree(r),
     width: `${Math.max((valueOf(r) / max) * 100, 1.5).toFixed(1)}%`,
@@ -80,7 +81,7 @@ const insight = computed(() => {
   const savedTotal = used.value.reduce((n, r) => n + (Number(r.total_saved_kg) || 0), 0)
   if (!used.value.length) return 'No trips logged yet. The first one will appear here.'
   if (savedTotal <= 0) {
-    return 'Every trip logged so far was by car, so none of them avoided any CO₂. One walk, ride or train journey changes that.'
+    return 'Every trip logged so far was by car, so none of them avoided CO₂e. One car-free trip changes that.'
   }
   const top = [...used.value].sort(
     (a, b) => (Number(b.total_saved_kg) || 0) - (Number(a.total_saved_kg) || 0)
@@ -88,7 +89,7 @@ const insight = computed(() => {
   const share = Math.round(((Number(top.total_saved_kg) || 0) / savedTotal) * 100)
   const where = props.scopeLabel ? ` ${props.scopeLabel}` : ''
   return (
-    `${top.mode_label} accounts for ${share}% of the CO₂ avoided${where}. ` +
+    `${MODE_LABELS[top.mode_key] ?? top.mode_label} accounts for ${share}% of the CO₂e avoided${where}. ` +
     'Car trips are logged too — they count towards participation but save nothing.'
   )
 })
@@ -100,7 +101,7 @@ const insight = computed(() => {
       <div>
         <h2 id="mode-heading">How people travel</h2>
         <p class="sub">
-          {{ measure === 'kg' ? 'CO₂ avoided versus driving, by mode' : 'Share of logged trips, by mode' }}
+          {{ measure === 'kg' ? 'CO₂e avoided versus driving, by mode' : 'Share of logged trips, by mode' }}
           <template v-if="scopeLabel"> · {{ scopeLabel }}</template>
         </p>
       </div>
@@ -119,7 +120,7 @@ const insight = computed(() => {
       </div>
       <p class="legend">
         <span class="key"><span class="swatch free" />Car-free</span>
-        <span class="key"><span class="swatch" />By car or motorbike</span>
+        <span class="key"><span class="swatch" />By car</span>
       </p>
 
       <ul class="rows">

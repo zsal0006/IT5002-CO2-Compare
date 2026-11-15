@@ -11,11 +11,6 @@ insert into public.data_sources (source_id, title, publisher, url, licence, retr
    'UK Department for Energy Security and Net Zero',
    'https://www.gov.uk/government/collections/government-conversion-factors-for-company-reporting',
    'Open Government Licence v3.0', current_date),
-  ('climatecouncil-2017',
-   'Transport Emissions fact sheet',
-   'Climate Council of Australia',
-   'https://www.climatecouncil.org.au/wp-content/uploads/2017/09/FactSheet-Transport.pdf',
-   'Copyright Climate Council, used with attribution', current_date),
   ('kaggle-vehicle-co2',
    'Vehicle CO2 Emissions Dataset',
    'brsahan (Kaggle)',
@@ -36,20 +31,11 @@ update public.emission_factors set is_baseline = false where is_baseline;
 
 insert into public.emission_factors
   (mode_key, mode_label, category, factor_g_per_pkm, is_baseline, display_order, source_id, notes) values
-  ('walking',       'Walking',             'active',           0,    false,  1, 'desnz-2024',          'Zero on an operational basis. Lifecycle food-energy effects are out of scope.'),
-  ('cycling',       'Cycling',             'active',           0,    false,  2, 'desnz-2024',          'Zero on an operational basis. Bicycle manufacture is out of scope.'),
-  ('e_scooter',     'E-scooter',           'other',            20,   false,  3, 'climatecouncil-2017', 'Shared-fleet lifecycle estimate; highly variable.'),
-  ('coach',         'Coach',               'public_transport', 27,   false,  4, 'desnz-2024',          'Average load factor.'),
-  ('train_metro',   'Metro / underground', 'public_transport', 28,   false,  5, 'desnz-2024',          'Average load factor.'),
-  ('tram',          'Tram / light rail',   'public_transport', 29,   false,  6, 'desnz-2024',          'Average load factor.'),
-  ('train_national','National rail',       'public_transport', 35,   false,  7, 'desnz-2024',          'Average load factor.'),
-  ('car_electric',  'Electric car',        'car',              47,   false,  8, 'kaggle-vehicle-co2',  'Grid average intensity; 1.6 occupants.'),
-  ('bus_city',      'City bus',            'public_transport', 97,   false,  9, 'desnz-2024',          'Average load factor; varies widely by time of day.'),
-  ('motorbike',     'Motorbike',           'other',            103,  false, 10, 'desnz-2024',          'Single rider.'),
-  ('ferry',         'Ferry (foot passenger)','other',          113,  false, 11, 'desnz-2024',          'Foot passenger, average vessel.'),
-  ('car_average',   'Car (average)',       'car',              170,  true,  12, 'kaggle-vehicle-co2',  'SAVINGS BASELINE. Fleet average, 1.6 occupants.'),
-  ('car_petrol',    'Petrol car',          'car',              170,  false, 13, 'kaggle-vehicle-co2',  'Medium petrol car, 1.6 occupants.'),
-  ('car_diesel',    'Diesel car',          'car',              171,  false, 14, 'kaggle-vehicle-co2',  'Medium diesel car, 1.6 occupants.')
+  ('cycling',        'Cycling', 'active',           0,   false, 1, 'desnz-2024',         'Zero on an operational basis. Bicycle manufacture is out of scope.'),
+  ('walking',        'Walking', 'active',           0,   false, 2, 'desnz-2024',         'Zero on an operational basis. Lifecycle food-energy effects are out of scope.'),
+  ('bus_city',       'Bus',     'public_transport', 97,  false, 3, 'desnz-2024',         'Average load factor; varies widely by time of day.'),
+  ('train_national', 'Train',   'public_transport', 35,  false, 4, 'desnz-2024',         'Average load factor.'),
+  ('car_average',    'Car',     'car',              170, true,  5, 'kaggle-vehicle-co2', 'Savings baseline. Fleet average, 1.6 occupants.')
 on conflict (mode_key) do update set
   mode_label       = excluded.mode_label,
   category         = excluded.category,
@@ -59,6 +45,11 @@ on conflict (mode_key) do update set
   source_id        = excluded.source_id,
   notes            = excluded.notes,
   is_active        = true;
+
+-- Retain historical factor rows referenced by trip logs, but stop offering
+-- modes outside the supported five to calculations and community summaries.
+update public.emission_factors
+set is_active = mode_key in ('cycling', 'walking', 'bus_city', 'train_national', 'car_average');
 
 -- Guard rail against loading per-vehicle values as per-passenger values.
 do $guard$

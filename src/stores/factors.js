@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
-import { FALLBACK_FACTORS, FALLBACK_FUEL_PRICE } from '@/lib/fallbackFactors'
-import { DEFAULT_COUNTRY_A2 } from '@/lib/locale'
+import { FALLBACK_FACTORS } from '@/lib/fallbackFactors'
+import { MODE_KEYS } from '@/lib/emissions'
 
 /**
  * Emission factors and their sources. Fetched once per session; the calculator
@@ -11,30 +11,12 @@ import { DEFAULT_COUNTRY_A2 } from '@/lib/locale'
 export const useFactorsStore = defineStore('factors', () => {
   const factors = ref([])
   const sources = ref([])
-  const fuelPrices = ref([])
   const loading = ref(false)
   const usingFallback = ref(false)
   const error = ref(null)
 
-  /**
-   * Pump price for a country. Australia is the default market, so an unknown
-   * country falls back to the AU row before the generic ZZ one — both are AUD,
-   * but AU is the figure we actually maintain.
-   */
-  function fuelPriceFor(countryCode) {
-    const rows = fuelPrices.value
-    if (!rows.length) return FALLBACK_FUEL_PRICE
-    return (
-      rows.find((r) => r.country_code === countryCode) ??
-      rows.find((r) => r.country_code === DEFAULT_COUNTRY_A2) ??
-      rows.find((r) => r.country_code === 'ZZ') ??
-      FALLBACK_FUEL_PRICE
-    )
-  }
-
   function useFallback(reason) {
     factors.value = FALLBACK_FACTORS
-    fuelPrices.value = [FALLBACK_FUEL_PRICE]
     usingFallback.value = true
     error.value = reason
   }
@@ -51,27 +33,26 @@ export const useFactorsStore = defineStore('factors', () => {
     }
 
     try {
-      const [factorRes, sourceRes, priceRes] = await Promise.all([
+      const [factorRes, sourceRes] = await Promise.all([
         supabase
           .from('emission_factors')
           .select('mode_key, mode_label, category, factor_g_per_pkm, is_baseline, display_order, source_id, notes')
           .eq('is_active', true)
+          .in('mode_key', MODE_KEYS)
           .order('display_order'),
-        supabase.from('data_sources').select('*'),
-        supabase.from('fuel_prices').select('*')
+        supabase.from('data_sources').select('*')
       ])
 
       if (factorRes.error) throw factorRes.error
+      if (sourceRes.error) console.warn('[CO2 Compare] Data sources unavailable:', sourceRes.error.message)
       if (!factorRes.data?.length) throw new Error('No emission factors returned')
+      if (factorRes.data.length !== MODE_KEYS.length) throw new Error('Not all supported mode factors were returned')
 
       factors.value = factorRes.data.map((f) => ({
         ...f,
         factor_g_per_pkm: Number(f.factor_g_per_pkm)
       }))
       sources.value = sourceRes.data ?? []
-      // Missing prices are not fatal: the money card simply falls back to the
-      // global figure rather than the whole calculator failing.
-      fuelPrices.value = priceRes.data?.length ? priceRes.data : [FALLBACK_FUEL_PRICE]
       usingFallback.value = false
     } catch (err) {
       useFallback(`Could not reach the database (${err.message}); showing bundled factors.`)
@@ -81,7 +62,6 @@ export const useFactorsStore = defineStore('factors', () => {
   }
 
   return {
-    factors, sources, fuelPrices, loading, error, usingFallback,
-    fuelPriceFor, load
+    factors, sources, loading, error, usingFallback, load
   }
 })

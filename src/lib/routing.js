@@ -1,13 +1,6 @@
-/**
- * Distance between two points.
- *
- * Primary source is OSRM's public demo server, which gives real road distance.
- * It is a best-effort service with no availability guarantee, so every call is
- * bounded by a timeout and falls back to a great-circle estimate (NFR-7).
- */
+import { invokeEdgeFunction } from '@/lib/edgeFunctions'
 
-const OSRM_BASE = 'https://router.project-osrm.org/route/v1'
-const TIMEOUT_MS = 3000
+const TIMEOUT_MS = 8000
 
 /**
  * Detour factor applied to the straight-line distance in fallback mode.
@@ -38,7 +31,8 @@ export function haversineKm(a, b) {
 /**
  * @typedef {object} RouteResult
  * @property {number}  km            distance in kilometres
- * @property {boolean} approximate   true when the OSRM call did not succeed
+ * @property {boolean} approximate   true when the OpenRouteService call failed
+ * @property {string|null} attribution
  */
 
 /**
@@ -49,28 +43,44 @@ export function haversineKm(a, b) {
  */
 export async function routeDistance(from, to, options = {}) {
   const profile = options.profile ?? 'driving'
-  const coords = `${from.lon},${from.lat};${to.lon},${to.lat}`
-  const url = `${OSRM_BASE}/${profile}/${coords}?overview=false`
+  const profiles = {
+    driving: 'driving-car',
+    cycling: 'cycling-regular',
+    walking: 'foot-walking'
+  }
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
 
   try {
-    const res = await fetch(url, { signal: controller.signal })
-    if (!res.ok) throw new Error(`OSRM responded ${res.status}`)
-    const json = await res.json()
-    const route = json.routes?.[0]
-    if (!route) throw new Error('OSRM returned no route')
+    const result = await invokeEdgeFunction(
+      'route-distance',
+      {
+        profile: profiles[profile] ?? profiles.driving,
+        coordinates: [
+          [from.lon, from.lat],
+          [to.lon, to.lat]
+        ]
+      },
+      { signal: controller.signal }
+    )
+    if (typeof result.distance !== 'number' || !Number.isFinite(result.distance) || result.distance <= 0) {
+      throw new Error('OpenRouteService returned an invalid route distance.')
+    }
 
     return {
-      km: route.distance / 1000,
-      approximate: false
+      km: result.distance / 1000,
+      approximate: false,
+      attribution: result.attribution || null
     }
   } catch (err) {
-    console.warn('[CO2 Compare] routing fell back to straight-line distance:', err.message)
+    if (err.name !== 'AbortError') {
+      console.warn('[CO2 Compare] routing fell back to straight-line distance:', err.message)
+    }
     return {
       km: haversineKm(from, to) * DETOUR_FACTOR,
-      approximate: true
+      approximate: true,
+      attribution: null
     }
   } finally {
     clearTimeout(timer)

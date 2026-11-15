@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import SegmentedControl from '@/components/SegmentedControl.vue'
+import SegmentedControl from '@/components/shared/SegmentedControl.vue'
 import { plural } from '@/lib/community'
 import { formatCo2, formatNumber, countryName } from '@/lib/format'
 
@@ -19,7 +19,8 @@ const props = defineProps({
   /** Rows from v_savings_by_region. */
   regions: { type: Array, required: true },
   /** `${country_code}|${region_name}` of the focused region, if any. */
-  selected: { type: String, default: null }
+  selected: { type: String, default: null },
+  selectable: { type: Boolean, default: true }
 })
 defineEmits(['select'])
 
@@ -63,7 +64,7 @@ const ranked = computed(() => {
     <header class="head">
       <div>
         <h2 id="region-heading">Regions</h2>
-        <p class="sub">Select a region to focus the page on it.</p>
+        <p class="sub">{{ selectable ? 'Select a region to focus the page on it.' : 'Regional details are unavailable.' }}</p>
       </div>
       <SegmentedControl v-model="sort" :options="SORTS" aria-label="Sort by" />
     </header>
@@ -75,6 +76,7 @@ const ranked = computed(() => {
           class="row"
           :class="{ on: r.key === selected }"
           :aria-pressed="String(r.key === selected)"
+          :disabled="!selectable"
           @click="$emit('select', r.key)"
         >
           <span class="rank" :class="{ lead: r.rank === 1 }">{{ r.rank }}</span>
