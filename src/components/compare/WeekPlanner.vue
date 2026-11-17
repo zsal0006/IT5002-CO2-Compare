@@ -76,24 +76,88 @@ const emissionsLabel = (kg) => `${formatNumber(kg, kg < 10 ? 2 : 1)} kg CO₂e`
     </div>
 
     <p class="equivalents">
-      {{ formatNumber(treeDays, 1) }} tree-days of CO₂ absorption equivalent
-      <span v-if="calories > 0"> · {{ formatNumber(calories, 0) }} kcal from walking or cycling</span>
+      {{ formatNumber(treeDays, 1) }} tree-days of CO₂ absorption
+      <span v-if="calories > 0"> - {{ formatNumber(calories, 0) }} kcal from walking or cycling</span>
     </p>
   </section>
 </template>
 
 <style scoped>
-.planner { display: grid; gap: 1rem; }
-.planner h2 { margin: 0; }
-.hint { margin: 0.25rem 0 0; color: var(--text-secondary); font-size: 0.8125rem; }
-.days { display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 0.625rem; }
-.day { display: grid; gap: 0.5rem; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-md); }
-.weekday { color: var(--text-secondary); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
-.day select { width: 100%; min-width: 0; }
-.day-emissions { font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
-.totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; }
-.totals p { display: grid; gap: 0.25rem; margin: 0; color: var(--text-secondary); font-size: 0.8125rem; }
-.totals strong { color: var(--text-primary); }
-.equivalents { margin: 0; padding: 0.875rem; border-radius: var(--radius-md); background: var(--surface-2); font-size: 0.875rem; }
-@media (max-width: 34rem) { .equivalents { font-size: 0.8125rem; } }
+.planner {
+  display: grid;
+  gap: 1rem;
+}
+
+.planner h2 {
+  margin: 0;
+}
+
+.hint {
+  margin: 0.25rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.days {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+  gap: 0.625rem;
+}
+
+.day {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.weekday {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.day select {
+  width: 100%;
+  min-width: 0;
+}
+
+.day-emissions {
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.totals p {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.totals strong {
+  color: var(--text-primary);
+}
+
+.equivalents {
+  margin: 0;
+  padding: 0.875rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 34rem) {
+  .equivalents {
+    font-size: 0.8125rem;
+  }
+}
 </style>

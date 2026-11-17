@@ -1,6 +1,7 @@
 const TREE_CO2_KG_PER_YEAR = 21.8
 const BODY_MASS_KG = 70
 
+// Active-mode profiles for calculating calories burned.
 const ACTIVE_MODES = {
   walking: { met: 3.5, speedKmh: 4.8 },
   cycling: { met: 7.5, speedKmh: 15 }

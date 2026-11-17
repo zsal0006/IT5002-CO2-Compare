@@ -123,8 +123,8 @@ function focusRegion(key) {
         </p>
       </div>
       <p class="anon">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="5" y="11" width="14" height="10" rx="2" />
           <path d="M8 11V7a4 4 0 0 1 8 0v4" />
         </svg>
@@ -137,16 +137,9 @@ function focusRegion(key) {
 
     <template v-else-if="stats.global">
       <p v-if="stats.warning" class="notice">{{ stats.warning }}</p>
-      <ImpactHero
-        :scope="scope"
-        :region-key="regionKey"
-        :regions="stats.byRegion"
-        :summary="summary"
-        :countries="Number(stats.global.countries) || 0"
-        :region-available="!stats.warning"
-        @update:scope="scope = $event"
-        @update:region-key="regionKey = $event"
-      />
+      <ImpactHero :scope="scope" :region-key="regionKey" :regions="stats.byRegion" :summary="summary"
+        :countries="Number(stats.global.countries) || 0" :region-available="!stats.warning"
+        @update:scope="scope = $event" @update:region-key="regionKey = $event" />
 
       <!-- E4 key figures. "This session" is the only one that is not a
            community total, so it says so and links back to where it changes. -->
@@ -155,7 +148,7 @@ function focusRegion(key) {
           <span class="kpi-label">This session</span>
           <span class="kpi-value">{{ formatCo2(trip.sessionSavedKg) }}</span>
           <span class="kpi-sub">
-            {{ trip.sessionSavedKg > 0 ? 'Avoided in this tab' : 'Nothing logged in this tab yet.' }}
+            {{ trip.sessionSavedKg > 0 ? 'Avoided in session' : 'No recorded trips for this session' }}
           </span>
           <RouterLink to="/" class="kpi-link">Log a trip on Compare →</RouterLink>
         </div>
@@ -174,7 +167,7 @@ function focusRegion(key) {
         <div class="card kpi">
           <span class="kpi-label">Average per trip</span>
           <span class="kpi-value">{{ formatCo2(averageKg) }}</span>
-          <span class="kpi-sub">CO₂e avoided per logged trip</span>
+          <span class="kpi-sub">CO₂e avoided per average trip</span>
         </div>
 
         <div class="card kpi">
@@ -186,25 +179,25 @@ function focusRegion(key) {
 
       <div class="panels">
         <ModeMix :rows="modeRows" :scope-label="scopeLabel" />
-        <RegionBoard
-          :regions="stats.byRegion"
-          :selected="scope === 'region' ? regionKey : null"
-          :selectable="!stats.warning"
-          @select="focusRegion"
-        />
+        <RegionBoard :regions="stats.byRegion" :selected="scope === 'region' ? regionKey : null"
+          :selectable="!stats.warning" @select="focusRegion" />
       </div>
 
       <p class="muted caveat">
         Totals are self-reported estimates. They show how people are using this tool, not
-        audited emissions reductions. Equivalents use the same factors as Compare — see
-        <RouterLink to="/learn">how we calculate this</RouterLink>.
+        verified emissions reductions.
       </p>
     </template>
   </section>
 </template>
 
 <style scoped>
-.page { padding: 2rem 0 3.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
+.page {
+  padding: 2rem 0 3.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
 
 .intro {
   display: flex;
@@ -213,9 +206,19 @@ function focusRegion(key) {
   align-items: flex-end;
   gap: 0.75rem 1.5rem;
 }
-.intro h1 { margin: 0; font-size: clamp(1.75rem, 4vw, 2.125rem); }
-.intro > div { max-width: 640px; }
-.intro p { margin: 0.5rem 0 0; }
+
+.intro h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 4vw, 2.125rem);
+}
+
+.intro>div {
+  max-width: 640px;
+}
+
+.intro p {
+  margin: 0.5rem 0 0;
+}
 
 .anon {
   display: inline-flex;
@@ -231,9 +234,19 @@ function focusRegion(key) {
   color: var(--text-secondary);
 }
 
-.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; }
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
 
-.kpi { display: flex; flex-direction: column; gap: 0.25rem; padding: 1.125rem; }
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1.125rem;
+}
+
 .kpi-label {
   font-size: 0.75rem;
   font-weight: 600;
@@ -241,15 +254,29 @@ function focusRegion(key) {
   text-transform: uppercase;
   color: var(--text-secondary);
 }
+
 .kpi-value {
   font-family: var(--font-display);
   font-size: 1.875rem;
   font-weight: 600;
   line-height: 1.1;
 }
-.kpi-value.accent { color: var(--accent); }
-.kpi-sub { font-size: 0.8125rem; color: var(--text-secondary); }
-.kpi-link { margin-top: 0.375rem; font-size: 0.8125rem; font-weight: 600; text-decoration: none; }
+
+.kpi-value.accent {
+  color: var(--accent);
+}
+
+.kpi-sub {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.kpi-link {
+  margin-top: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+}
 
 .kpi-track {
   margin-top: 0.5rem;
@@ -259,6 +286,7 @@ function focusRegion(key) {
   overflow: hidden;
   display: block;
 }
+
 .kpi-fill {
   display: block;
   height: 100%;
@@ -266,8 +294,20 @@ function focusRegion(key) {
   transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.panels { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: flex-start; }
-.panels > * { flex: 1 1 440px; min-width: 0; }
+.panels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: flex-start;
+}
 
-.caveat { margin: 0; max-width: 760px; }
+.panels>* {
+  flex: 1 1 440px;
+  min-width: 0;
+}
+
+.caveat {
+  margin: 0;
+  max-width: 760px;
+}
 </style>

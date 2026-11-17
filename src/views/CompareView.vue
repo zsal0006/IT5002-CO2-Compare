@@ -96,10 +96,6 @@ function swapPlaces() {
       </button>
 
       <p v-if="trip.error" class="notice error" role="alert">{{ trip.error }}</p>
-      <p v-if="trip.approximate" class="notice">
-        Routing was unavailable. The displayed distance uses a {{ DETOUR_FACTOR }}× straight-line
-        estimate and is approximate.
-      </p>
       <p v-if="origin || destination" class="provider-credit">
         Address data:
         <AddressAttribution :places="[origin, destination]" />

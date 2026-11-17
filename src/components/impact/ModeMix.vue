@@ -81,7 +81,7 @@ const insight = computed(() => {
   const savedTotal = used.value.reduce((n, r) => n + (Number(r.total_saved_kg) || 0), 0)
   if (!used.value.length) return 'No trips logged yet. The first one will appear here.'
   if (savedTotal <= 0) {
-    return 'Every trip logged so far was by car, so none of them avoided CO₂e. One car-free trip changes that.'
+    return 'Every trip so far was by car, so none of them avoided CO₂e. One car-free trip changes that.'
   }
   const top = [...used.value].sort(
     (a, b) => (Number(b.total_saved_kg) || 0) - (Number(a.total_saved_kg) || 0)
@@ -90,7 +90,7 @@ const insight = computed(() => {
   const where = props.scopeLabel ? ` ${props.scopeLabel}` : ''
   return (
     `${MODE_LABELS[top.mode_key] ?? top.mode_label} accounts for ${share}% of the CO₂e avoided${where}. ` +
-    'Car trips are logged too — they count towards participation but save nothing.'
+    'Car trips are counted towards total, but save nothing.'
   )
 })
 </script>
@@ -101,7 +101,7 @@ const insight = computed(() => {
       <div>
         <h2 id="mode-heading">How people travel</h2>
         <p class="sub">
-          {{ measure === 'kg' ? 'CO₂e avoided versus driving, by mode' : 'Share of logged trips, by mode' }}
+          {{ measure === 'kg' ? 'CO₂e avoided versus driving, by mode' : 'Share of trips, by mode' }}
           <template v-if="scopeLabel"> · {{ scopeLabel }}</template>
         </p>
       </div>
@@ -110,13 +110,7 @@ const insight = computed(() => {
 
     <template v-if="ranked.length">
       <div class="mixbar" aria-hidden="true">
-        <span
-          v-for="s in mix"
-          :key="s.key"
-          class="seg"
-          :class="{ free: s.carFree }"
-          :style="{ width: s.width }"
-        />
+        <span v-for="s in mix" :key="s.key" class="seg" :class="{ free: s.carFree }" :style="{ width: s.width }" />
       </div>
       <p class="legend">
         <span class="key"><span class="swatch free" />Car-free</span>
@@ -126,8 +120,8 @@ const insight = computed(() => {
       <ul class="rows">
         <li v-for="r in ranked" :key="r.key">
           <span class="icon" :class="{ free: r.carFree }" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+              stroke-linecap="round" stroke-linejoin="round">
               <path :d="r.icon" />
             </svg>
           </span>
@@ -148,8 +142,8 @@ const insight = computed(() => {
     </template>
 
     <p class="insight">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V16h8v-1.3A7 7 0 0 0 12 2z" />
       </svg>
       <span>{{ insight }}</span>
@@ -158,7 +152,12 @@ const insight = computed(() => {
 </template>
 
 <style scoped>
-.mix { display: flex; flex-direction: column; gap: 1rem; padding: 1.375rem; }
+.mix {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.375rem;
+}
 
 .head {
   display: flex;
@@ -167,19 +166,71 @@ const insight = computed(() => {
   align-items: flex-end;
   gap: 0.625rem;
 }
-.head h2 { margin: 0; font-size: 1.25rem; }
-.sub { margin: 0.125rem 0 0; font-size: 0.8125rem; color: var(--text-secondary); }
 
-.mixbar { display: flex; height: 14px; border-radius: var(--radius-pill); overflow: hidden; background: var(--surface-2); }
-.seg { display: block; height: 100%; background: var(--series-1); transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.seg.free { background: var(--accent); }
+.head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
 
-.legend { display: flex; flex-wrap: wrap; gap: 0.375rem 1rem; margin: 0; font-size: 0.75rem; color: var(--text-secondary); }
-.key { display: inline-flex; align-items: center; gap: 0.375rem; }
-.swatch { width: 10px; height: 10px; border-radius: 3px; background: var(--series-1); }
-.swatch.free { background: var(--accent); }
+.sub {
+  margin: 0.125rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
 
-.rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.mixbar {
+  display: flex;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.seg {
+  display: block;
+  height: 100%;
+  background: var(--series-1);
+  transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.seg.free {
+  background: var(--accent);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 1rem;
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--series-1);
+}
+
+.swatch.free {
+  background: var(--accent);
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .rows li {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) 84px;
@@ -199,14 +250,43 @@ const insight = computed(() => {
   background: var(--series-1-soft);
   color: var(--series-1-soft-text);
 }
-.icon.free { background: var(--accent-soft); color: var(--accent-soft-text); }
 
-.body { display: flex; flex-direction: column; gap: 0.375rem; min-width: 0; }
-.line { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.875rem; }
-.name { font-weight: 600; }
-.meta { color: var(--text-secondary); font-size: 0.75rem; }
+.icon.free {
+  background: var(--accent-soft);
+  color: var(--accent-soft-text);
+}
 
-.track { height: 8px; border-radius: var(--radius-pill); background: var(--surface-2); display: block; overflow: hidden; }
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.line {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.meta {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.track {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  display: block;
+  overflow: hidden;
+}
+
 .bar {
   display: block;
   height: 100%;
@@ -214,9 +294,17 @@ const insight = computed(() => {
   background: var(--series-1);
   transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.bar.free { background: var(--accent); }
 
-.value { font-size: 0.875rem; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.bar.free {
+  background: var(--accent);
+}
+
+.value {
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 
 .insight {
   display: flex;
@@ -230,10 +318,21 @@ const insight = computed(() => {
   font-size: 0.8125rem;
   line-height: 1.45;
 }
-.insight svg { flex: none; margin-top: 1px; }
+
+.insight svg {
+  flex: none;
+  margin-top: 1px;
+}
 
 @media (max-width: 440px) {
-  .rows li { grid-template-columns: 32px minmax(0, 1fr) 68px; gap: 0.5rem; }
-  .icon { width: 32px; height: 32px; }
+  .rows li {
+    grid-template-columns: 32px minmax(0, 1fr) 68px;
+    gap: 0.5rem;
+  }
+
+  .icon {
+    width: 32px;
+    height: 32px;
+  }
 }
 </style>

@@ -21,8 +21,8 @@ const { sessionSavedKg } = storeToRefs(trip)
       <RouterLink to="/" class="brand">
         <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
           <circle cx="14" cy="14" r="13" fill="var(--accent)" />
-          <path d="M9 17c0-5 4-8 10-8 0 6-3 10-8 10-1 0-2-.4-2-2z" fill="none"
-                stroke="#fff" stroke-width="1.8" stroke-linejoin="round" />
+          <path d="M9 17c0-5 4-8 10-8 0 6-3 10-8 10-1 0-2-.4-2-2z" fill="none" stroke="#fff" stroke-width="1.8"
+            stroke-linejoin="round" />
           <path d="M9 19l6-6" stroke="#fff" stroke-width="1.8" stroke-linecap="round" />
         </svg>
         <span>CO₂ Compare</span>
@@ -34,8 +34,8 @@ const { sessionSavedKg } = storeToRefs(trip)
         <RouterLink to="/dashboard">Dashboard</RouterLink>
 
         <span v-if="sessionSavedKg > 0" class="tally pop">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M5 19c0-8 6-13 15-14 0 9-5 15-12 15-2 0-3-1-3-1zM5 19l7-7" />
           </svg>
           <span class="visually-hidden">Saved this session:</span>
@@ -51,11 +51,11 @@ const { sessionSavedKg } = storeToRefs(trip)
 
   <footer class="site-footer">
     <div class="container foot">
-      <span>CO₂ Compare · IT5002 coursework project</span>
+      <span>CO₂ Compare - IT5002 coursework project</span>
       <span>
-        Emission factors credited on
-        <RouterLink to="/learn">how we calculate this</RouterLink>. Address search by
-        Geoapify; routing by OpenRouteService; boundaries from Natural Earth.
+        Emission factors credited on <RouterLink to="/learn">how we calculate this</RouterLink>. Geo-coordination
+        provided by
+        Geoapify with routing by OpenRouteService; boundaries from Natural Earth.
       </span>
     </div>
   </footer>
@@ -71,9 +71,17 @@ const { sessionSavedKg } = storeToRefs(trip)
   border-radius: var(--radius-sm);
   z-index: 10;
 }
-.skip:focus { left: 0.5rem; top: 0.5rem; }
 
-.site-header { background: var(--surface-1); border-bottom: 1px solid var(--border); }
+.skip:focus {
+  left: 0.5rem;
+  top: 0.5rem;
+}
+
+.site-header {
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+}
+
 .bar {
   display: flex;
   flex-wrap: wrap;
@@ -95,7 +103,12 @@ const { sessionSavedKg } = storeToRefs(trip)
   letter-spacing: -0.01em;
 }
 
-nav { display: flex; gap: 0.25rem; align-items: center; }
+nav {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
 nav a {
   padding: 0.625rem 0.875rem;
   border-radius: var(--radius-sm);
@@ -104,7 +117,11 @@ nav a {
   font-weight: 500;
   color: var(--text-secondary);
 }
-nav a:hover { color: var(--text-primary); }
+
+nav a:hover {
+  color: var(--text-primary);
+}
+
 nav a.router-link-active {
   background: var(--accent-soft);
   color: var(--accent-soft-text);
@@ -123,9 +140,17 @@ nav a.router-link-active {
   font-size: 0.8125rem;
   font-weight: 600;
 }
-.tally svg { color: var(--on-ink-accent); }
 
-.site-footer { border-top: 1px solid var(--border); background: var(--surface-1); margin-top: 3rem; }
+.tally svg {
+  color: var(--on-ink-accent);
+}
+
+.site-footer {
+  border-top: 1px solid var(--border);
+  background: var(--surface-1);
+  margin-top: 3rem;
+}
+
 .foot {
   display: flex;
   flex-wrap: wrap;

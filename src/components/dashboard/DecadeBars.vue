@@ -34,7 +34,7 @@ const decades = computed(() => {
 <template>
   <section v-if="decades.length > 1" class="card decades" aria-labelledby="decade-heading">
     <header>
-      <h2 id="decade-heading">Decade by decade<span v-if="countryName"> · {{ countryName }}</span></h2>
+      <h2 id="decade-heading">Decade by decade<span v-if="countryName">: {{ countryName }}</span></h2>
       <p class="sub">Average yearly emissions, and growth on the decade before.</p>
     </header>
 
@@ -59,11 +59,32 @@ const decades = computed(() => {
 </template>
 
 <style scoped>
-.decades { display: flex; flex-direction: column; gap: 0.875rem; padding: 1.375rem; }
-.decades h2 { margin: 0; font-size: 1.25rem; }
-.sub { margin: 0.125rem 0 0; font-size: 0.8125rem; color: var(--text-secondary); }
+.decades {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding: 1.375rem;
+}
 
-.chart { display: flex; align-items: flex-end; gap: 0.875rem; height: 200px; padding-top: 1.5rem; }
+.decades h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.sub {
+  margin: 0.125rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.875rem;
+  height: 200px;
+  padding-top: 1.5rem;
+}
+
 .col {
   flex: 1;
   min-width: 0;
@@ -74,7 +95,12 @@ const decades = computed(() => {
   align-items: center;
   gap: 0.375rem;
 }
-.value { font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.value {
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 
 .bar {
   display: block;
@@ -84,12 +110,36 @@ const decades = computed(() => {
   border-radius: 8px 8px 3px 3px;
   transition: height 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.bar.latest { background: var(--accent); }
 
-.labels { display: flex; gap: 0.875rem; }
-.label { flex: 1; min-width: 0; text-align: center; display: flex; flex-direction: column; }
-.name { font-size: 0.75rem; font-weight: 600; }
-.growth { font-size: 0.6875rem; font-weight: 600; color: var(--text-secondary); }
+.bar.latest {
+  background: var(--accent);
+}
 
-.unit { margin: 0; }
+.labels {
+  display: flex;
+  gap: 0.875rem;
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.name {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.growth {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.unit {
+  margin: 0;
+}
 </style>
