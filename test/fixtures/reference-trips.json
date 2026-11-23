@@ -1,0 +1,12 @@
+[
+  { "distanceKm": 0.25,  "carKg": 0.0425, "busKg": 0.02425, "trainKg": 0.00875, "busSavedKg": 0.01825, "trainSavedKg": 0.03375 },
+  { "distanceKm": 0.8,   "carKg": 0.136,  "busKg": 0.0776,  "trainKg": 0.028,   "busSavedKg": 0.0584,  "trainSavedKg": 0.108 },
+  { "distanceKm": 1,     "carKg": 0.17,   "busKg": 0.097,   "trainKg": 0.035,   "busSavedKg": 0.073,   "trainSavedKg": 0.135 },
+  { "distanceKm": 2.5,   "carKg": 0.425,  "busKg": 0.2425,  "trainKg": 0.0875,  "busSavedKg": 0.1825,  "trainSavedKg": 0.3375 },
+  { "distanceKm": 4.75,  "carKg": 0.8075, "busKg": 0.46075, "trainKg": 0.16625, "busSavedKg": 0.34675, "trainSavedKg": 0.64125 },
+  { "distanceKm": 6.9,   "carKg": 1.173,  "busKg": 0.6693,  "trainKg": 0.2415,  "busSavedKg": 0.5037,  "trainSavedKg": 0.9315 },
+  { "distanceKm": 10,    "carKg": 1.7,    "busKg": 0.97,    "trainKg": 0.35,    "busSavedKg": 0.73,    "trainSavedKg": 1.35 },
+  { "distanceKm": 12.34, "carKg": 2.0978, "busKg": 1.19698, "trainKg": 0.4319,  "busSavedKg": 0.90082, "trainSavedKg": 1.6659 },
+  { "distanceKm": 25,    "carKg": 4.25,   "busKg": 2.425,   "trainKg": 0.875,   "busSavedKg": 1.825,   "trainSavedKg": 3.375 },
+  { "distanceKm": 42.2,  "carKg": 7.174,  "busKg": 4.0934,  "trainKg": 1.477,   "busSavedKg": 3.0806,  "trainSavedKg": 5.697 }
+]
