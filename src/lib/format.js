@@ -19,11 +19,6 @@ export function formatNumber(value, digits = 1) {
   return nf(digits).format(value)
 }
 
-export function formatKm(km) {
-  if (!Number.isFinite(km)) return '—'
-  return km < 10 ? `${nf(1).format(km)} km` : `${nf(0).format(km)} km`
-}
-
 const regionNames =
   typeof Intl.DisplayNames === 'function'
     ? new Intl.DisplayNames([LOCALE], { type: 'region' })

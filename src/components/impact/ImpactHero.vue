@@ -18,7 +18,8 @@ const props = defineProps({
   summary: { type: Object, required: true },
   /** Distinct countries taking part, globally. */
   countries: { type: Number, default: 0 },
-  regionAvailable: { type: Boolean, default: true }
+  regionAvailable: { type: Boolean, default: true },
+  modeBreakdownComplete: { type: Boolean, default: true }
 })
 const emit = defineEmits(['update:scope', 'update:regionKey'])
 
@@ -67,9 +68,11 @@ const headline = computed(() => {
 
 const chips = computed(() => {
   const out = [
-    { key: 'trips', num: String(props.summary.trips ?? 0), label: props.summary.trips === 1 ? 'trip logged' : 'trips logged' },
-    { key: 'carfree', num: String(props.summary.carFreeTrips ?? 0), label: 'car-free' }
+    { key: 'trips', num: String(props.summary.trips ?? 0), label: props.summary.trips === 1 ? 'trip logged' : 'trips logged' }
   ]
+  if (props.modeBreakdownComplete) {
+    out.push({ key: 'carfree', num: String(props.summary.carFreeTrips ?? 0), label: 'car-free' })
+  }
   if (props.scope === 'global') {
     out.push({ key: 'countries', num: String(props.countries), label: props.countries === 1 ? 'country' : 'countries' })
   } else if (current.value) {
@@ -135,7 +138,7 @@ const milestoneText = computed(() => {
       </div>
     </div>
 
-    <div class="equivalent">
+    <div v-if="modeBreakdownComplete" class="equivalent">
       <strong>{{ formatNumber(carFreeKm, carFreeKm < 100 ? 1 : 0) }} km</strong>
       <span>travelled without a car</span>
     </div>

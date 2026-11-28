@@ -1,12 +1,15 @@
-import { handleOptions, jsonResponse, readJsonObject } from '../_shared/http.ts'
+import { handleOptions, jsonResponse, rateLimit, readJsonObject } from '../_shared/http.ts'
 
 const GEOAPIFY_BASE_URL = 'https://api.geoapify.com/v1/geocode'
 const REQUEST_TIMEOUT_MS = 8000
+const REQUESTS_PER_MINUTE = 60
 
 Deno.serve(async (request: Request) => {
   const optionsResponse = handleOptions(request)
   if (optionsResponse) return optionsResponse
   if (request.method !== 'POST') return jsonResponse({ error: 'Method not allowed.' }, 405)
+  const limited = rateLimit(request, 'address-search', REQUESTS_PER_MINUTE)
+  if (limited) return limited
 
   const body = await readJsonObject(request)
   if (body instanceof Response) return body

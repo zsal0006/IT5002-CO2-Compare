@@ -1,8 +1,10 @@
 <script setup>
 import { computed } from 'vue'
-import { formatKm, formatNumber } from '@/lib/format'
-import { carEquivalentKm } from '@/lib/emissions'
+import { formatNumber } from '@/lib/format'
+import { carEquivalentKm, emissionsKg, savedKg } from '@/lib/emissions'
 import { caloriesBurned, treeAbsorptionDays } from '@/lib/journeyImpact'
+import { assessWeather } from '@/lib/weather'
+import WeatherStrip from '@/components/compare/WeatherStrip.vue'
 
 const props = defineProps({
   modes: { type: Array, required: true },
@@ -11,17 +13,19 @@ const props = defineProps({
   destinationLabel: { type: String, default: '' },
   returnTrip: { type: Boolean, default: false },
   selectedModeKey: { type: String, default: null },
-  logging: { type: Boolean, default: false }
+  logging: { type: Boolean, default: false },
+  weather: { type: Object, default: null }
 })
 
 const emit = defineEmits(['update:selectedModeKey', 'log'])
 const shortPlace = (label) => label.split(',')[0].trim()
+const assessment = computed(() => assessWeather(props.weather))
 
 const rows = computed(() => {
   const baseline = props.modes.find((mode) => mode.isBaseline)
   if (!baseline) return []
 
-  const grams = props.modes.map((mode) => mode.factor * props.distanceKm)
+  const grams = props.modes.map((mode) => emissionsKg(props.distanceKm, mode.factor) * 1000)
   const maxGrams = Math.max(...grams, 0)
 
   return props.modes
@@ -37,7 +41,10 @@ const rows = computed(() => {
         ),
         treeDays: mode.isBaseline
           ? null
-          : treeAbsorptionDays(Math.max(0, (baseline.factor - mode.factor) * props.distanceKm / 1000)),
+          : treeAbsorptionDays(savedKg(props.distanceKm, mode.factor, baseline.factor)),
+        savedPercent: baseline.factor > 0
+          ? Math.max(0, (1 - mode.factor / baseline.factor) * 100)
+          : 0,
         calories: caloriesBurned(mode.modeKey, props.distanceKm),
         width: maxGrams > 0 ? `${(emissionsGrams / maxGrams) * 100}%` : '0%'
       }
@@ -61,11 +68,12 @@ const selectedMode = computed(() =>
           <span>{{ shortPlace(destinationLabel) || 'Destination' }}</span>
         </template>
         <span aria-hidden="true">·</span>
-        <span>{{ formatKm(distanceKm) }} {{ returnTrip ? 'return' : 'one way' }}</span>
+        <span>{{ formatNumber(distanceKm, 2) }} km {{ returnTrip ? 'return' : 'one way' }}</span>
       </p>
       <p class="hint">
         Grams CO₂e generated per trip (Note: CO2e is a measurement of carbon dioxide equivalent averaged over 100 years)
       </p>
+      <WeatherStrip v-if="weather" :weather="weather" />
     </header>
 
     <ol v-if="rows.length" class="rows">
@@ -77,10 +85,16 @@ const selectedMode = computed(() =>
             <span class="row-heading">
               <span class="mode-name">
                 <strong>{{ mode.label }}</strong>
-
+                <span v-if="assessment[mode.modeKey]" class="weather-badge" :class="assessment[mode.modeKey].rating">
+                  {{ assessment[mode.modeKey].label }}<template v-if="assessment[mode.modeKey].reasons.length">
+                    - {{ assessment[mode.modeKey].reasons.join(', ') }}</template>
+                </span>
               </span>
-              <strong class="value">
-                {{ formatNumber(mode.emissionsGrams, mode.emissionsGrams < 10 ? 1 : 0) }} g CO₂e </strong>
+              <span class="value-stack">
+                <strong class="value">
+                  {{ formatNumber(mode.emissionsGrams, mode.emissionsGrams < 10 ? 1 : 0) }} g CO₂e </strong>
+                    <small class="mode-context">{{ formatNumber(mode.savedPercent, 0) }}% lower than driving</small>
+              </span>
             </span>
             <span class="track" role="img"
               :aria-label="`${mode.label}: ${formatNumber(mode.factor, 0)} grams CO₂e per passenger-kilometre`">
@@ -205,10 +219,37 @@ header h2 {
   gap: 0.375rem 0.625rem;
 }
 
+.weather-badge {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(245, 180, 60, 0.16);
+  color: #f5c25c;
+}
+
+.weather-badge.good {
+  background: rgba(74, 222, 128, 0.16);
+  color: var(--on-ink-accent);
+}
+
+.weather-badge.poor {
+  background: rgba(248, 113, 113, 0.16);
+  color: #fca5a5;
+}
+
 .mode-context {
   color: var(--on-ink-3);
   font-size: 0.75rem;
   font-weight: 400;
+}
+
+.value-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.125rem;
+  text-align: right;
 }
 
 .value {

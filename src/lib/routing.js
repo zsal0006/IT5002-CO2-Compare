@@ -38,17 +38,9 @@ export function haversineKm(a, b) {
 /**
  * @param {{lat:number, lon:number}} from
  * @param {{lat:number, lon:number}} to
- * @param {{profile?: 'driving'|'cycling'|'walking'}} [options]
  * @returns {Promise<RouteResult>}
  */
-export async function routeDistance(from, to, options = {}) {
-  const profile = options.profile ?? 'driving'
-  const profiles = {
-    driving: 'driving-car',
-    cycling: 'cycling-regular',
-    walking: 'foot-walking'
-  }
-
+export async function routeDistance(from, to) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
 
@@ -56,7 +48,7 @@ export async function routeDistance(from, to, options = {}) {
     const result = await invokeEdgeFunction(
       'route-distance',
       {
-        profile: profiles[profile] ?? profiles.driving,
+        profile: 'driving-car',
         coordinates: [
           [from.lon, from.lat],
           [to.lon, to.lat]

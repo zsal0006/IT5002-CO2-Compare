@@ -23,6 +23,7 @@ const trip = useTripStore()
 
 const scope = ref('global')
 const regionKey = ref(null)
+const showRegions = ref(false)
 
 onMounted(() => stats.load())
 
@@ -67,7 +68,13 @@ const modeRows = computed(() => {
  */
 const summary = computed(() => {
   const fromModes = summariseModes(modeRows.value)
-  if (scope.value === 'region') return fromModes
+  if (scope.value === 'region') {
+    return {
+      ...fromModes,
+      trips: Number(selectedRegion.value?.trips) || 0,
+      savedKg: Number(selectedRegion.value?.total_saved_kg) || 0
+    }
+  }
 
   return {
     trips: Number(stats.global?.trips) || 0,
@@ -76,6 +83,8 @@ const summary = computed(() => {
     carFreeKm: fromModes.carFreeKm
   }
 })
+
+const modeBreakdownComplete = computed(() => summariseModes(modeRows.value).trips === summary.value.trips)
 
 const scopeLabel = computed(() =>
   scope.value === 'global' ? 'worldwide' : selectedRegion.value?.region_name ?? ''
@@ -132,13 +141,20 @@ function focusRegion(key) {
       </p>
     </header>
 
+    <p v-if="trip.lastLog" class="notice success" role="status">
+      Trip logged: {{ formatCo2(trip.lastLog.savedKg) }} CO₂e avoided versus driving.
+    </p>
     <p v-if="stats.error" class="notice error">{{ stats.error }}</p>
     <p v-else-if="stats.loading && !stats.global" class="muted">Loading community totals…</p>
 
     <template v-else-if="stats.global">
       <p v-if="stats.warning" class="notice">{{ stats.warning }}</p>
+      <p v-if="!modeBreakdownComplete" class="notice">
+        Some logged trips are missing from the available mode breakdown, which covers supported modes only.
+      </p>
       <ImpactHero :scope="scope" :region-key="regionKey" :regions="stats.byRegion" :summary="summary"
         :countries="Number(stats.global.countries) || 0" :region-available="!stats.warning"
+        :mode-breakdown-complete="modeBreakdownComplete"
         @update:scope="scope = $event" @update:region-key="regionKey = $event" />
 
       <!-- E4 key figures. "This session" is the only one that is not a
@@ -148,18 +164,19 @@ function focusRegion(key) {
           <span class="kpi-label">This session</span>
           <span class="kpi-value">{{ formatCo2(trip.sessionSavedKg) }}</span>
           <span class="kpi-sub">
-            {{ trip.sessionSavedKg > 0 ? 'Avoided in session' : 'No recorded trips for this session' }}
+            {{ trip.sessionTrips ? `${plural(trip.sessionTrips, 'trip')} logged in this session` : 'No recorded trips for this session' }}
           </span>
           <RouterLink to="/" class="kpi-link">Log a trip on Compare →</RouterLink>
         </div>
 
         <div class="card kpi">
           <span class="kpi-label">Car-free trips</span>
-          <span class="kpi-value accent">{{ carFreePct }}%</span>
-          <span class="kpi-sub">
+          <span class="kpi-value accent">{{ modeBreakdownComplete ? `${carFreePct}%` : 'Unavailable' }}</span>
+          <span v-if="modeBreakdownComplete" class="kpi-sub">
             {{ summary.carFreeTrips }} of {{ plural(summary.trips, 'trip') }} left the car at home
           </span>
-          <span class="kpi-track">
+          <span v-else class="kpi-sub">Not available for all logged modes.</span>
+          <span v-if="modeBreakdownComplete" class="kpi-track">
             <span class="kpi-fill" :style="{ width: `${carFreePct}%` }" />
           </span>
         </div>
@@ -179,13 +196,21 @@ function focusRegion(key) {
 
       <div class="panels">
         <ModeMix :rows="modeRows" :scope-label="scopeLabel" />
-        <RegionBoard :regions="stats.byRegion" :selected="scope === 'region' ? regionKey : null"
-          :selectable="!stats.warning" @select="focusRegion" />
+
+        <div class="regions">
+          <button type="button" class="regions-toggle" :aria-expanded="String(showRegions)"
+            aria-controls="regions-panel" @click="showRegions = !showRegions">
+            <span>Regions <span class="count">{{ stats.byRegion.length }}</span></span>
+            <span aria-hidden="true">{{ showRegions ? 'Hide ▴' : 'Show ▾' }}</span>
+          </button>
+          <RegionBoard v-if="showRegions" id="regions-panel" :regions="stats.byRegion"
+            :selected="scope === 'region' ? regionKey : null" :selectable="!stats.warning" @select="focusRegion" />
+        </div>
       </div>
 
       <p class="muted caveat">
         Totals are self-reported estimates. They show how people are using this tool, not
-        verified emissions reductions.
+        verified emissions reductions. Community totals are rounded to the nearest 10 g.
       </p>
     </template>
   </section>
@@ -196,7 +221,7 @@ function focusRegion(key) {
   padding: 2rem 0 3.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.875rem;
 }
 
 .intro {
@@ -236,19 +261,23 @@ function focusRegion(key) {
 
 .kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.625rem;
+}
+
+@media (max-width: 900px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .kpi {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: 1.125rem;
+  gap: 0.125rem;
+  padding: 0.75rem 0.875rem;
 }
 
 .kpi-label {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -257,7 +286,7 @@ function focusRegion(key) {
 
 .kpi-value {
   font-family: var(--font-display);
-  font-size: 1.875rem;
+  font-size: 1.375rem;
   font-weight: 600;
   line-height: 1.1;
 }
@@ -267,20 +296,20 @@ function focusRegion(key) {
 }
 
 .kpi-sub {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
 }
 
 .kpi-link {
-  margin-top: 0.375rem;
-  font-size: 0.8125rem;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
   font-weight: 600;
   text-decoration: none;
 }
 
 .kpi-track {
-  margin-top: 0.5rem;
-  height: 8px;
+  margin-top: 0.375rem;
+  height: 6px;
   border-radius: var(--radius-pill);
   background: var(--series-1-soft);
   overflow: hidden;
@@ -296,14 +325,34 @@ function focusRegion(key) {
 
 .panels {
   display: flex;
-  flex-wrap: wrap;
-  gap: 1.25rem;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-.panels>* {
-  flex: 1 1 440px;
-  min-width: 0;
+.regions { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.regions-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.regions-toggle .count {
+  margin-left: 0.375rem;
+  padding: 0.0625rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-soft-text);
+  font-size: 0.75rem;
 }
 
 .caveat {

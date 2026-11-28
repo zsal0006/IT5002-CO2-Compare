@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { caloriesBurned, treeAbsorptionDays } from '@/lib/journeyImpact'
+import { emissionsKg } from '@/lib/emissions'
 import { formatNumber } from '@/lib/format'
 
 const props = defineProps({
@@ -25,7 +26,7 @@ watch(
 const roundTripKm = computed(() => props.distanceKm * 2)
 const carMode = computed(() => props.modes.find((mode) => mode.isBaseline))
 const carDayKg = computed(() =>
-  carMode.value ? (carMode.value.factor * roundTripKm.value) / 1000 : 0
+  carMode.value ? emissionsKg(roundTripKm.value, carMode.value.factor) : 0
 )
 
 const days = computed(() =>
@@ -35,7 +36,7 @@ const days = computed(() =>
       day: DAYS[index],
       modeKey,
       label: mode?.label ?? '—',
-      kg: mode ? (mode.factor * roundTripKm.value) / 1000 : 0,
+      kg: mode ? emissionsKg(roundTripKm.value, mode.factor) : 0,
       calories: caloriesBurned(modeKey, roundTripKm.value)
     }
   })

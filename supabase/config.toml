@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.route-distance]
 verify_jwt = true
+
+[functions.weather]
+verify_jwt = true

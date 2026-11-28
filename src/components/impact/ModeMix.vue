@@ -2,20 +2,19 @@
 import { computed, ref } from 'vue'
 import SegmentedControl from '@/components/shared/SegmentedControl.vue'
 import { iconFor } from '@/lib/modeIcons'
-import { isCarFree, plural } from '@/lib/community'
+import { isCarFree, plural, summariseModes } from '@/lib/community'
 import { formatCo2 } from '@/lib/format'
 import { MODE_LABELS } from '@/lib/emissions'
 
 /**
- * How people travel: the mode split, by CO₂e avoided or by number of trips.
+ * How people travel: the mode split, by CO₂e avoided or by number of trips,
+ * with the CO₂e each mode generated beside what it avoided versus driving.
  *
  * Those two measures rank differently on purpose, and the toggle is the point —
  * a mode chosen rarely for long journeys out-saves one chosen often for short
  * hops, which is the observation story 4.2 is after.
  *
- * Car-free and car-borne are told apart by green against blue, the same pairing
- * as the Compare page. That pair narrows under deuteranopia, so every row is
- * also named, every bar is directly labelled, and the legend prints both.
+ * Every mode is named and its figures printed, so nothing depends on colour alone.
  */
 const props = defineProps({
   /** Rows from v_savings_by_mode, filtered to the current scope. */
@@ -34,51 +33,75 @@ const measure = ref('kg')
 const used = computed(() => props.rows.filter((r) => Number(r.trips) > 0))
 
 const totals = computed(() => {
-  const trips = used.value.reduce((n, r) => n + Number(r.trips), 0)
-  const carFreeTrips = used.value
-    .filter(isCarFree)
-    .reduce((n, r) => n + Number(r.trips), 0)
-  return { trips, carFreeTrips, carTrips: trips - carFreeTrips }
+  const { trips, carFreeTrips, savedKg } = summariseModes(used.value)
+  return { trips, carFreeTrips, carTrips: trips - carFreeTrips, savedKg }
 })
 
 const valueOf = (row) =>
   measure.value === 'kg' ? Number(row.total_saved_kg) || 0 : Number(row.trips) || 0
 
+const MODE_COLORS = {
+  cycling: '#a855f7',
+  walking: 'var(--accent)',
+  bus_city: 'var(--series-2)',
+  train_national: 'var(--series-3)',
+  car_average: 'var(--series-1)'
+}
+
+const percentage = (share) => (share > 0 && share < 0.1 ? '<0.1%' : `${Number(share.toFixed(1))}%`)
+
+/** Conic-gradient pie from [{ color, value }] entries; zero values are skipped. */
+function pieOf(entries) {
+  const total = entries.reduce((n, e) => n + e.value, 0)
+  if (!total) return null
+  let start = 0
+  const stops = entries
+    .filter((e) => e.value > 0)
+    .map((e) => {
+      const end = start + (e.value / total) * 100
+      const stop = `${e.color} ${start}% ${end}%`
+      start = end
+      return stop
+    })
+  return `conic-gradient(${stops.join(', ')})`
+}
+
 const ranked = computed(() => {
   const list = [...used.value].sort((a, b) => valueOf(b) - valueOf(a))
-  const max = Math.max(...list.map(valueOf), 0.0001)
+  const total = list.reduce((n, r) => n + valueOf(r), 0)
   return list.map((r) => ({
     key: r.mode_key,
     name: MODE_LABELS[r.mode_key] ?? r.mode_label,
     icon: iconFor(r.mode_key),
     carFree: isCarFree(r),
-    width: `${Math.max((valueOf(r) / max) * 100, 1.5).toFixed(1)}%`,
-    value:
-      measure.value === 'kg'
-        ? formatCo2(Number(r.total_saved_kg) || 0)
-        : plural(r.trips, 'trip'),
-    meta:
-      measure.value === 'kg'
-        ? plural(r.trips, 'trip')
-        : formatCo2(Number(r.total_saved_kg) || 0)
+    color: MODE_COLORS[r.mode_key] ?? 'var(--series-1)',
+    amount: valueOf(r),
+    share: total ? (valueOf(r) / total) * 100 : 0,
+    emitted: formatCo2(Number(r.total_emitted_kg) || 0),
+    saved: formatCo2(Number(r.total_saved_kg) || 0),
+    trips: plural(r.trips, 'trip')
   }))
 })
 
-const mix = computed(() => {
+const modePie = computed(() =>
+  pieOf(ranked.value.map((r) => ({ color: r.color, value: r.amount })))
+)
+
+const carSplit = computed(() => {
   const { trips, carFreeTrips, carTrips } = totals.value
-  if (!trips) return []
-  return [
-    { key: 'free', width: `${((carFreeTrips / trips) * 100).toFixed(1)}%`, carFree: true },
-    { key: 'car', width: `${((carTrips / trips) * 100).toFixed(1)}%`, carFree: false }
-  ].filter((s) => parseFloat(s.width) > 0)
+  return {
+    pie: pieOf([
+      { color: 'var(--accent)', value: carFreeTrips },
+      { color: 'var(--series-1)', value: carTrips }
+    ]),
+    freeShare: trips ? (carFreeTrips / trips) * 100 : 0,
+    carShare: trips ? (carTrips / trips) * 100 : 0
+  }
 })
 
-/**
- * One sentence naming what the chart shows, so the finding is stated rather
- * than left for the reader to infer from bar lengths.
- */
+/** One sentence stating the finding rather than leaving it to be inferred. */
 const insight = computed(() => {
-  const savedTotal = used.value.reduce((n, r) => n + (Number(r.total_saved_kg) || 0), 0)
+  const savedTotal = totals.value.savedKg
   if (!used.value.length) return 'No trips logged yet. The first one will appear here.'
   if (savedTotal <= 0) {
     return 'Every trip so far was by car, so none of them avoided CO₂e. One car-free trip changes that.'
@@ -108,231 +131,132 @@ const insight = computed(() => {
       <SegmentedControl v-model="measure" :options="MEASURES" aria-label="Measure" />
     </header>
 
-    <template v-if="ranked.length">
-      <div class="mixbar" aria-hidden="true">
-        <span v-for="s in mix" :key="s.key" class="seg" :class="{ free: s.carFree }" :style="{ width: s.width }" />
+    <div v-if="ranked.length" class="body-grid">
+      <div class="pies">
+        <figure v-if="modePie" class="pie-fig">
+          <div class="pie" :style="{ background: modePie }" role="img"
+            :aria-label="measure === 'kg' ? 'CO₂e avoided by mode' : 'Trips by mode'" />
+          <figcaption>{{ measure === 'kg' ? 'CO₂e avoided' : 'Trips' }}</figcaption>
+        </figure>
+        <figure class="pie-fig">
+          <div class="pie" :style="{ background: carSplit.pie }" role="img" aria-label="Car-free versus car trips" />
+          <figcaption>
+            <span class="key"><span class="swatch free" />Car-free {{ percentage(carSplit.freeShare) }}</span>
+            <span class="key"><span class="swatch" />By car {{ percentage(carSplit.carShare) }}</span>
+          </figcaption>
+        </figure>
       </div>
-      <p class="legend">
-        <span class="key"><span class="swatch free" />Car-free</span>
-        <span class="key"><span class="swatch" />By car</span>
-      </p>
 
-      <ul class="rows">
-        <li v-for="r in ranked" :key="r.key">
-          <span class="icon" :class="{ free: r.carFree }" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path :d="r.icon" />
-            </svg>
-          </span>
-
-          <span class="body">
-            <span class="line">
+      <div class="table" role="table" aria-label="CO₂e generated and avoided by mode">
+        <div class="trow thead" role="row">
+          <span role="columnheader">Mode</span>
+          <span role="columnheader" class="num">Generated</span>
+          <span role="columnheader" class="num">Avoided</span>
+        </div>
+        <div v-for="r in ranked" :key="r.key" class="trow" role="row">
+          <span class="mode" role="cell">
+            <span class="icon" :class="{ free: r.carFree }" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path :d="r.icon" />
+              </svg>
+            </span>
+            <span class="mode-text">
               <span class="name">{{ r.name }}</span>
-              <span class="meta">{{ r.meta }}</span>
-            </span>
-            <span class="track">
-              <span class="bar" :class="{ free: r.carFree }" :style="{ width: r.width }" />
+              <span class="meta">
+                <span class="swatch" :style="{ background: r.color }" aria-hidden="true" />
+                {{ r.trips }} · {{ percentage(r.share) }}
+              </span>
             </span>
           </span>
-
-          <span class="value">{{ r.value }}</span>
-        </li>
-      </ul>
-    </template>
+          <span class="num emitted" role="cell">{{ r.emitted }}</span>
+          <span class="num avoided" role="cell">{{ r.saved }}</span>
+        </div>
+      </div>
+    </div>
 
     <p class="insight">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V16h8v-1.3A7 7 0 0 0 12 2z" />
       </svg>
-      <span>{{ insight }}</span>
+      <span>{{ insight }} <span class="note">Based on trips, not unique users.</span></span>
     </p>
   </section>
 </template>
 
 <style scoped>
-.mix {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  padding: 1.375rem;
+.mix { display: flex; flex-direction: column; gap: 0.875rem; padding: 1rem 1.125rem; }
+
+.head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.head h2 { margin: 0; font-size: 1.0625rem; }
+.sub { margin: 0.125rem 0 0; font-size: 0.75rem; color: var(--text-secondary); }
+
+.body-grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1.25rem; align-items: center; }
+
+.pies { display: flex; gap: 1rem; }
+.pie-fig { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 0.375rem; }
+.pie { width: 104px; aspect-ratio: 1; border-radius: 50%; background: var(--surface-2); }
+.pie-fig figcaption {
+  display: flex; flex-direction: column; align-items: center; gap: 0.125rem;
+  font-size: 0.6875rem; color: var(--text-secondary);
 }
 
-.head {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 0.625rem;
-}
+.key { display: inline-flex; align-items: center; gap: 0.3rem; }
+.swatch { width: 8px; height: 8px; border-radius: 2px; background: var(--series-1); flex: none; }
+.swatch.free { background: var(--accent); }
 
-.head h2 {
-  margin: 0;
-  font-size: 1.25rem;
-}
-
-.sub {
-  margin: 0.125rem 0 0;
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-}
-
-.mixbar {
-  display: flex;
-  height: 14px;
-  border-radius: var(--radius-pill);
-  overflow: hidden;
-  background: var(--surface-2);
-}
-
-.seg {
-  display: block;
-  height: 100%;
-  background: var(--series-1);
-  transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.seg.free {
-  background: var(--accent);
-}
-
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem 1rem;
-  margin: 0;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
-.key {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-}
-
-.swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  background: var(--series-1);
-}
-
-.swatch.free {
-  background: var(--accent);
-}
-
-.rows {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.rows li {
+.table { display: flex; flex-direction: column; min-width: 0; }
+.trow {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 84px;
-  gap: 0.75rem;
-  align-items: center;
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--gridline);
-}
-
-.icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--series-1-soft);
-  color: var(--series-1-soft-text);
-}
-
-.icon.free {
-  background: var(--accent-soft);
-  color: var(--accent-soft-text);
-}
-
-.body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  min-width: 0;
-}
-
-.line {
-  display: flex;
-  justify-content: space-between;
+  grid-template-columns: minmax(0, 1fr) 5.5rem 5.5rem;
   gap: 0.5rem;
-  font-size: 0.875rem;
+  align-items: center;
+  padding: 0.375rem 0;
+  border-top: 1px solid var(--gridline);
+  font-size: 0.8125rem;
 }
-
-.name {
+.thead {
+  border-top: 0;
+  padding-top: 0;
+  font-size: 0.6875rem;
   font-weight: 600;
-}
-
-.meta {
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: var(--text-secondary);
-  font-size: 0.75rem;
 }
+.num { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.thead .num { font-weight: 600; }
+.emitted { color: var(--series-1-soft-text); }
+.avoided { color: var(--accent); }
 
-.track {
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  display: block;
-  overflow: hidden;
+.mode { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.icon {
+  flex: none; width: 28px; height: 28px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--series-1-soft); color: var(--series-1-soft-text);
 }
-
-.bar {
-  display: block;
-  height: 100%;
-  border-radius: var(--radius-pill);
-  background: var(--series-1);
-  transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.bar.free {
-  background: var(--accent);
-}
-
-.value {
-  font-size: 0.875rem;
-  font-weight: 700;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
+.icon.free { background: var(--accent-soft); color: var(--accent-soft-text); }
+.mode-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.name { font-weight: 600; }
+.meta { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.6875rem; color: var(--text-secondary); }
 
 .insight {
-  display: flex;
-  gap: 0.625rem;
-  align-items: flex-start;
-  margin: 0;
-  background: var(--accent-soft);
-  color: var(--accent-soft-text);
-  border-radius: var(--radius-md);
-  padding: 0.75rem 0.875rem;
-  font-size: 0.8125rem;
-  line-height: 1.45;
+  display: flex; gap: 0.5rem; align-items: flex-start; margin: 0;
+  background: var(--accent-soft); color: var(--accent-soft-text);
+  border-radius: var(--radius-md); padding: 0.5rem 0.75rem;
+  font-size: 0.75rem; line-height: 1.4;
 }
+.insight svg { flex: none; margin-top: 1px; }
+.note { opacity: 0.8; }
 
-.insight svg {
-  flex: none;
-  margin-top: 1px;
+@media (max-width: 720px) {
+  .body-grid { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
+  .pies { justify-content: center; }
 }
 
 @media (max-width: 440px) {
-  .rows li {
-    grid-template-columns: 32px minmax(0, 1fr) 68px;
-    gap: 0.5rem;
-  }
-
-  .icon {
-    width: 32px;
-    height: 32px;
-  }
+  .trow { grid-template-columns: minmax(0, 1fr) 4.5rem 4.5rem; gap: 0.375rem; font-size: 0.75rem; }
+  .pie { width: 88px; }
 }
 </style>

@@ -1,13 +1,16 @@
-import { handleOptions, jsonResponse, readJsonObject } from '../_shared/http.ts'
+import { handleOptions, jsonResponse, rateLimit, readJsonObject } from '../_shared/http.ts'
 
-const ORS_BASE_URL = 'https://api.openrouteservice.org/v2/directions'
+const ORS_BASE_URL = 'https://api.heigit.org/openrouteservice/v2/directions'
 const REQUEST_TIMEOUT_MS = 10000
+const REQUESTS_PER_MINUTE = 20
 const PROFILES = new Set(['driving-car', 'cycling-regular', 'foot-walking'])
 
 Deno.serve(async (request: Request) => {
   const optionsResponse = handleOptions(request)
   if (optionsResponse) return optionsResponse
   if (request.method !== 'POST') return jsonResponse({ error: 'Method not allowed.' }, 405)
+  const limited = rateLimit(request, 'route-distance', REQUESTS_PER_MINUTE)
+  if (limited) return limited
 
   const body = await readJsonObject(request)
   if (body instanceof Response) return body

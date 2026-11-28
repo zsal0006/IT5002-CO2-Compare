@@ -146,5 +146,5 @@ export const EMISSION_RAMP = [
 export function binIndex(value) {
   const v = Number(value)
   if (!Number.isFinite(v) || v <= 0) return -1
-  return EMISSION_BINS.findIndex((b) => v <= b.max)
+  return EMISSION_BINS.findIndex((b) => v < b.max)
 }

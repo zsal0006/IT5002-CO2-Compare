@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { routeDistance } from '@/lib/routing'
+import { fetchWeather } from '@/lib/weather'
 import { compare, MODE_KEYS, MODE_LABELS } from '@/lib/emissions'
 import { useFactorsStore } from '@/stores/factors'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
@@ -31,12 +32,16 @@ export const useTripStore = defineStore('trip', () => {
   const logging = ref(false)
   const lastLog = ref(null)
   const sessionSavedKg = ref(0)  // session only; cleared when the tab closes
+  const sessionTrips = ref(0)
 
   const ready = computed(() => Boolean(origin.value && destination.value))
 
   /** Distance actually used in the calculation, doubled for a return trip. */
   const effectiveKm = computed(() =>
-    distanceKm.value == null ? null : distanceKm.value * (returnTrip.value ? 2 : 1)
+    distanceKm.value == null ? null : Number((distanceKm.value * (returnTrip.value ? 2 : 1)).toFixed(2))
+  )
+  const comparisonUsesFallback = computed(() =>
+    serverModes.value.length !== MODE_KEYS.length || serverKm.value !== effectiveKm.value
   )
 
   /**
@@ -50,9 +55,7 @@ export const useTripStore = defineStore('trip', () => {
    */
   const allModes = computed(() => {
     if (effectiveKm.value == null) return []
-    if (serverModes.value.length === MODE_KEYS.length && serverKm.value === effectiveKm.value) {
-      return serverModes.value
-    }
+    if (!comparisonUsesFallback.value) return serverModes.value
     const factorsStore = useFactorsStore()
     return compare(effectiveKm.value, factorsStore.factors)
   })
@@ -100,7 +103,22 @@ export const useTripStore = defineStore('trip', () => {
     if (distanceKm.value != null) fetchComparison()
   })
 
-  watch([origin, destination], () => {
+  // Optional extra: never blocks or fails the comparison.
+  const weather = ref(null)
+  async function loadWeather() {
+    const from = origin.value
+    weather.value = null
+    if (!from || !supabaseConfigured) return
+    try {
+      const result = await fetchWeather(from)
+      if (origin.value === from) weather.value = result
+    } catch (err) {
+      if (err.name !== 'AbortError') console.warn('[CO2 Compare] Weather unavailable:', err.message)
+    }
+  }
+
+  watch([origin, destination], ([newOrigin], [oldOrigin]) => {
+    if (newOrigin !== oldOrigin) weather.value = null
     distanceKm.value = null
     approximate.value = false
     routeAttribution.value = null
@@ -121,12 +139,14 @@ export const useTripStore = defineStore('trip', () => {
     try {
       const result = await routeDistance(from, to)
       if (origin.value !== from || destination.value !== to) return
-      if (!Number.isFinite(result.km) || result.km <= 0) {
-        throw new Error('The journey distance must be greater than zero.')
+      if (!Number.isFinite(result.km) || result.km <= 0 ||
+          Number((result.km * (returnTrip.value ? 2 : 1)).toFixed(2)) <= 0) {
+        throw new Error('The journey distance must be at least 0.01 km after rounding.')
       }
       distanceKm.value = result.km
       approximate.value = result.approximate
       routeAttribution.value = result.attribution
+      loadWeather()
       await fetchComparison()
     } catch (err) {
       if (origin.value !== from || destination.value !== to) return
@@ -169,6 +189,7 @@ export const useTripStore = defineStore('trip', () => {
         savedKg: Number(data.saved_kg)
       }
       sessionSavedKg.value += Number(data.saved_kg)
+      sessionTrips.value++
       return lastLog.value
     } catch (err) {
       error.value = err.message || 'Could not log that trip.'
@@ -181,8 +202,8 @@ export const useTripStore = defineStore('trip', () => {
   return {
     origin, destination, returnTrip,
     distanceKm, effectiveKm, approximate, routeAttribution,
-    calculating, error, logging, lastLog, sessionSavedKg,
-    ready, comparison,
+    calculating, error, logging, lastLog, sessionSavedKg, sessionTrips,
+    weather, ready, comparison, comparisonUsesFallback,
     calculate, logTrip
   }
 })

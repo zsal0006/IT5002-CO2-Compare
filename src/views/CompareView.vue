@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useRouter } from 'vue-router'
 import LocationInput from '@/components/compare/LocationInput.vue'
 import AddressAttribution from '@/components/compare/AddressAttribution.vue'
 import ComparisonBars from '@/components/compare/ComparisonBars.vue'
@@ -11,6 +12,7 @@ import { useStatsStore } from '@/stores/stats'
 import { formatCo2 } from '@/lib/format'
 import { DETOUR_FACTOR } from '@/lib/routing'
 
+const router = useRouter()
 const trip = useTripStore()
 const factors = useFactorsStore()
 const stats = useStatsStore()
@@ -31,7 +33,10 @@ async function calculate() {
 async function logMode() {
   if (!selectedModeKey.value) return
   const result = await trip.logTrip(selectedModeKey.value)
-  if (result) await stats.load({ force: true })
+  if (result) {
+    await stats.load({ force: true })
+    await router.push({ name: 'impact' })
+  }
 }
 
 function swapPlaces() {
@@ -96,18 +101,20 @@ function swapPlaces() {
       </button>
 
       <p v-if="trip.error" class="notice error" role="alert">{{ trip.error }}</p>
+      <p v-if="trip.approximate" class="notice">
+        Routing was unavailable. The displayed distance uses a {{ DETOUR_FACTOR }}× straight-line
+        estimate and is approximate.
+      </p>
+
       <p v-if="origin || destination" class="provider-credit">
         Address data:
         <AddressAttribution :places="[origin, destination]" />
-      </p>
-      <p v-if="trip.routeAttribution" class="provider-credit">
-        Route data: {{ trip.routeAttribution }}
       </p>
 
       <div class="results">
         <ComparisonBars :modes="trip.comparison" :distance-km="trip.effectiveKm" :origin-label="origin?.label ?? ''"
           :destination-label="destination?.label ?? ''" :return-trip="returnTrip"
-          v-model:selected-mode-key="selectedModeKey" :logging="trip.logging" @log="logMode" />
+          v-model:selected-mode-key="selectedModeKey" :logging="trip.logging" :weather="trip.weather" @log="logMode" />
         <WeekPlanner :modes="trip.comparison" :distance-km="trip.distanceKm" />
         <p v-if="trip.lastLog" class="notice success" role="status">
           Logged. You avoided {{ formatCo2(trip.lastLog.savedKg) }} CO₂e compared with driving.

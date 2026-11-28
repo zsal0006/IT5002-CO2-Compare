@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import SegmentedControl from '@/components/shared/SegmentedControl.vue'
+import DecadeBars from '@/components/dashboard/DecadeBars.vue'
 import { areaPath, percentChange, signedPercent, usableRows } from '@/lib/series'
 import { formatNumber } from '@/lib/format'
 
@@ -22,7 +23,7 @@ const props = defineProps({
 })
 
 const WIDTH = 1000
-const HEIGHT = 280
+const HEIGHT = 200
 
 const PERIODS = [
   { value: 'all', label: 'Full record' },
@@ -205,6 +206,8 @@ const insights = computed(() => {
         </span>
       </p>
 
+      <div class="layout">
+      <div class="main">
       <div class="plot">
         <div class="y-axis" aria-hidden="true">
           <span>{{ formatNumber(geometry.max, 0) }}</span>
@@ -258,6 +261,10 @@ const insights = computed(() => {
         />
         <output for="trend-year">{{ selected.year }}</output>
       </div>
+      </div>
+
+      <DecadeBars :rows="rows" :country-name="countryName" />
+      </div>
 
       <ul class="insights">
         <li v-for="i in insights" :key="i.key" :class="i.tone">
@@ -299,14 +306,18 @@ const insights = computed(() => {
 </template>
 
 <style scoped>
-.trend { display: flex; flex-direction: column; gap: 1rem; }
+.trend { display: flex; flex-direction: column; gap: 0.75rem; padding: 1.125rem; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 1.25rem; align-items: start; }
+.main { display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; }
+@media (max-width: 820px) { .layout { grid-template-columns: minmax(0, 1fr); } }
 
 .head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 0.75rem; }
 .head h2 { margin: 0; font-size: 1.25rem; }
 .sub { margin: 0.125rem 0 0; font-size: 0.8125rem; color: var(--text-secondary); }
 
 .readout { display: flex; flex-wrap: wrap; gap: 0.5rem 1.75rem; align-items: baseline; margin: 0; }
-.figure { font-family: var(--font-display); font-size: 2.125rem; font-weight: 600; letter-spacing: -0.02em; color: var(--text-primary); }
+.figure { font-family: var(--font-display); font-size: 1.625rem; font-weight: 600; letter-spacing: -0.02em; color: var(--text-primary); }
 .in-year { font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); }
 .yoy { font-size: 0.8125rem; font-weight: 600; color: var(--success-text); }
 .yoy.up { color: var(--series-1-soft-text); }
@@ -314,7 +325,7 @@ const insights = computed(() => {
 
 .plot { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 0.5rem; }
 .y-axis {
-  height: 280px;
+  height: 200px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -326,7 +337,7 @@ const insights = computed(() => {
   margin: -0.5em 0;
   padding: 0.5em 0;
 }
-.canvas { position: relative; height: 280px; }
+.canvas { position: relative; height: 200px; }
 .canvas svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 
 .grid { stroke: var(--gridline); }
@@ -379,14 +390,14 @@ const insights = computed(() => {
   font-variant-numeric: tabular-nums;
 }
 
-.insights { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.625rem; }
+.insights { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.5rem; }
 .insights li {
   display: flex;
-  gap: 0.625rem;
+  gap: 0.5rem;
   background: var(--page);
   border-radius: var(--radius-md);
-  padding: 0.75rem 0.875rem;
-  font-size: 0.8125rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   line-height: 1.45;
 }
